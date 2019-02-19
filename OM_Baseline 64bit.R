@@ -929,6 +929,35 @@ catch_res[, dimnames(catch_res)$year <= 2017] <- 1
 idx<-hadTSA_idx
 idx_dev<-hadTSA_idx_dev
 
+# remove iteration 66
+its<-1:1000
+its<-its[-66]
+stk_fwd<-iter(stk_fwd,its)
+stk_oem<-iter(stk_oem,its)
+sr<-iter(sr,its)
+sr_res<-iter(sr_res,its)
+catch_res<-iter(catch_res,its)
+idx[[1]]<-iter(idx[[1]],its)
+idx[[2]]<-iter(idx[[2]],its)
+idx_dev[[1]]<-iter(idx_dev[[1]],its)
+idx_dev[[2]]<-iter(idx_dev[[2]],its)
+
+
+# its<-66
+# iter(stk_fwd,its)@stock.n[,"2000"]
+# 
+# iter(stk_oem,its)
+# iter(sr,its)
+# iter(sr_res,its)
+# iter(catch_res,its)
+# iter(idx[[1]],its)
+# iter(idx[[2]],its)
+# iter(idx_dev[[1]],its)
+# iter(idx_dev[[2]],its)
+
+#change n
+n<-999
+
 ### path
 input_path <- paste0("input/had4/", n, "_", n_years, "/")
 dir.create(input_path)

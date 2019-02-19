@@ -36,7 +36,7 @@ setwd(paste("/home/coleh/WKNSMSE/wk_WKNSMSE_had.27.46a20", sep=""))
 omName<-"Baseline"
 #omName<-"Alt1"
 #set n
-n<-1000
+n<-999
 
 load(file=paste0("input/had4/image_OM",omName,"_",n,".RData"))
 
@@ -45,6 +45,20 @@ invisible(lapply(list.files(path = "functions/", pattern = "*.R$",
                             full.names = TRUE), source))
 # MP run name
 MPrunName<-"Base"
+#
+#test_iter<-66
+#stk_fwd<-iter(stk_fwd,test_iter)
+#stk_oem<-iter(stk_oem,test_iter)
+#sr<-iter(sr,test_iter)
+#sr_res<-iter(sr_res,test_iter)
+#catch_res<-iter(catch_res,test_iter)
+#idx[[1]]<-iter(idx[[1]],test_iter)
+#idx[[2]]<-iter(idx[[2]],test_iter)
+#idx_dev[[1]]<-iter(idx_dev[[1]],test_iter)
+#idx_dev[[2]]<-iter(idx_dev[[2]],test_iter)
+#
+#n<-1
+#iters<-1
 
 
 ### ------------------------------------------------------------------------ ###
@@ -54,7 +68,7 @@ MPrunName<-"Base"
 ### reference points
 refpts_mse <- list(Btrigger = 132000,
                    Blim=94000,
-                   #  Flim=0.38,
+                 #  Flim=0.38,
                    Ftrgt = 0.194,
                    Fpa = 0.274,
                    Bpa = 132000)

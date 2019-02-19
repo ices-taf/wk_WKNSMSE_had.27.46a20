@@ -72,13 +72,13 @@ path_out <- paste0("output/had4/runs/", iters, "_", years)
   # option 13:24
   hcr_vals<-rbind(hcr_vals,
   expand.grid(Ftrgt = seq(from = 0.28, to = 0.30, by = 0.01),
-    Btrigger = rep(180000,3)),
+    Btrigger = 180000),
      expand.grid(Ftrgt = seq(from = 0.27, to = 0.29, by = 0.01),
-    Btrigger = rep(170000,3)),
+    Btrigger = 170000),
          expand.grid(Ftrgt = seq(from = 0.26, to = 0.28, by = 0.01),
-    Btrigger = rep(160000,3)),
+    Btrigger = 160000),
          expand.grid(Ftrgt = seq(from = 0.25, to = 0.27, by = 0.01),
-    Btrigger = rep(150000,3))
+    Btrigger = 150000)
     )
 }
 
