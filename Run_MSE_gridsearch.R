@@ -48,7 +48,7 @@ library(tidyr)
 library(dplyr)
 
 ### load additional functions
-setwd(paste("/home/coleh/WKNSMSE/wk_WKNSMSE_had.27.46a20", sep=""))
+#setwd(paste("/home/coleh/WKNSMSE/wk_WKNSMSE_had.27.46a20", sep=""))
 source("a4a_mse_WKNSMSE_funs.R")
 invisible(lapply(list.files(path = "functions/", pattern = "*.R$", 
                             full.names = TRUE), source))
@@ -61,108 +61,108 @@ path_out <- paste0("output/had4/runs/", iters, "_", years)
 
 ### ------------------------------------------------------------------------ ###
 ### set HCR parameters 
-  ### ------------------------------------------------------------------------ ###
+### ------------------------------------------------------------------------ ###
 
-    if (HCRoption %in% 1:6) {
-    #options 1:12
+if (HCRoption %in% 1:6) {
+  #options 1:12
   hcr_vals <- expand.grid(
     Ftrgt = seq(from = 0.1, to = 0.3, by = 0.1),
     Btrigger = seq(from = 120000, to = 150000, by = 10000))
   
-  # option 13:24
+  # option 13:29
   hcr_vals<-rbind(hcr_vals,
-  expand.grid(Ftrgt = seq(from = 0.28, to = 0.30, by = 0.01),
-    Btrigger = 180000),
-     expand.grid(Ftrgt = seq(from = 0.27, to = 0.29, by = 0.01),
-    Btrigger = 170000),
-         expand.grid(Ftrgt = seq(from = 0.26, to = 0.28, by = 0.01),
-    Btrigger = 160000),
-         expand.grid(Ftrgt = seq(from = 0.25, to = 0.27, by = 0.01),
-    Btrigger = 150000)
-    )
+                  expand.grid(Ftrgt = c(0.2,seq(from = 0.28, to = 0.30, by = 0.01)),
+                              Btrigger = 180000),
+                  expand.grid(Ftrgt = c(0.2,seq(from = 0.27, to = 0.29, by = 0.01),0.3),
+                              Btrigger = 170000),
+                  expand.grid(Ftrgt = c(0.2,seq(from = 0.26, to = 0.28, by = 0.01),0.3),
+                              Btrigger = 160000),
+                  expand.grid(Ftrgt = seq(from = 0.25, to = 0.27, by = 0.01),
+                              Btrigger = 150000)
+  )
 }
 
-  if (par_env == 1) {
-    
-    library(doMPI)
-    cl <- startMPIcluster()
-    registerDoMPI(cl)
-    cl_length <- cl$workerCount
-    
-  } else if (par_env == 2) {
-    
-    library(doParallel)
-    cl <- makeCluster(n_workers)
-    registerDoParallel(cl)
-    cl_length <- length(cl)
-    
-  }
+if (par_env == 1) {
   
+  library(doMPI)
+  cl <- startMPIcluster()
+  registerDoMPI(cl)
+  cl_length <- cl$workerCount
   
+} else if (par_env == 2) {
+  
+  library(doParallel)
+  cl <- makeCluster(n_workers)
+  registerDoParallel(cl)
+  cl_length <- length(cl)
+  
+}
+
+
 #if(FALSE){  
-  ### load packages and functions into workers
-  . <- foreach(i = seq(cl_length)) %dopar% {
-    #devtools::load_all("../mse/")
-    library(mse)
-    library(FLash)
-    library(FLfse)
-    library(stockassessment)
-    library(foreach)
-    library(doRNG)
-    setwd(paste("/home/coleh/WKNSMSE/wk_WKNSMSE_had.27.46a20", sep=""))
-    
-    source("a4a_mse_WKNSMSE_funs.R")
-    invisible(lapply(list.files(path = "functions/", pattern = "*.R$", 
-                                full.names = TRUE), source))
-  }
-  
-  ### set random seed for reproducibility
+### load packages and functions into workers
+. <- foreach(i = seq(cl_length)) %dopar% {
+  #devtools::load_all("../mse/")
+  library(mse)
+  library(FLash)
+  library(FLfse)
+  library(stockassessment)
+  library(foreach)
   library(doRNG)
-  registerDoRNG(123)
- # }
-  ### ------------------------------------------------------------------------ ###
-  ### load data for MSE ####
-  ### ------------------------------------------------------------------------ ###
+#  setwd(paste("/home/coleh/WKNSMSE/wk_WKNSMSE_had.27.46a20", sep=""))
   
-  ### data path
-  path_data <- paste0("input/had4/")
-  
-  omName<-"Baseline"
-  MPrunName<-"Base"
-  n<-iters
-  
-  ### load input objects
-  input<-readRDS(file = paste0(path_data,"/MP_base/MP",MPrunName,"_OM",omName,"_",n,".rds"))
-  
-  ### modify input for running in parallel
-  input$genArgs$nblocks <- nblocks
-  
+  source("a4a_mse_WKNSMSE_funs.R")
+  invisible(lapply(list.files(path = "functions/", pattern = "*.R$", 
+                              full.names = TRUE), source))
+}
+
+### set random seed for reproducibility
+library(doRNG)
+registerDoRNG(123)
+# }
+### ------------------------------------------------------------------------ ###
+### load data for MSE ####
+### ------------------------------------------------------------------------ ###
+
+### data path
+path_data <- paste0("input/had4/")
+
+omName<-"Baseline"
+MPrunName<-"Base"
+n<-iters
+
+### load input objects
+input<-readRDS(file = paste0(path_data,"/MP_base/MP",MPrunName,"_OM",omName,"_",n,".rds"))
+
+### modify input for running in parallel
+input$genArgs$nblocks <- nblocks
 
 
-  ### ------------------------------------------------------------------------ ###
-  ### set HCR option: A, B, C
-  if (exists("HCRoption")) {
-    
-    input$ctrl.mp$ctrl.hcr@args$option <- switch(HCRoption, 
-                                                 "1" = "A", 
-                                                 "2" = "B", 
-                                                 "3" = "C",
-                                                 "4" = "A",
-                                                 "5" = "B",
-                                                 "6" = "C")
-    
-    cat(paste0("\nSetting custom HCR option: HCRoption = ", HCRoption, 
-               " => HCR ", input$ctrl.mp$ctrl.hcr@args$option, "\n\n"))
-    
-  } else {
-    
-    cat(paste0("\nUsing default HCR option: HCR ", 
-               input$ctrl.mp$ctrl.hcr@args$option, "\n\n"))
-    HCRoption <- 0
-  }
+
+### ------------------------------------------------------------------------ ###
+### set HCR option: A, B, C
+if (exists("HCRoption")) {
   
+  input$ctrl.mp$ctrl.hcr@args$option <- switch(HCRoption, 
+                                               "1" = "A", 
+                                               "2" = "B", 
+                                               "3" = "C",
+                                               "4" = "A",
+                                               "5" = "B",
+                                               "6" = "C")
+  
+  cat(paste0("\nSetting custom HCR option: HCRoption = ", HCRoption, 
+             " => HCR ", input$ctrl.mp$ctrl.hcr@args$option, "\n\n"))
+  
+} else {
+  
+  cat(paste0("\nUsing default HCR option: HCR ", 
+             input$ctrl.mp$ctrl.hcr@args$option, "\n\n"))
+  HCRoption <- 0
+}
+
 input_bckp <- input
-for (HCR_comb in 13:24) {
+for (HCR_comb in 1:nrow(hcr_vals)) {
   input <- input_bckp
   
   ### implement
@@ -292,8 +292,8 @@ for (HCR_comb in 13:24) {
   print(Sys.time())
   
   ### save results
-   path_out <- paste0("output/had4/runs/",omName,"/", n, "_", years)
- 
+  path_out <- paste0("output/had4/runs/",omName,"/", n, "_", years)
+  
   dir.create(path = path_out, recursive = TRUE)
   file_out <- paste0("HCR-", input$ctrl.mp$ctrl.hcr@args$option,
                      "_Ftrgt-", input$ctrl.mp$ctrl.phcr@args$Ftrgt,
@@ -304,50 +304,49 @@ for (HCR_comb in 13:24) {
   
   saveRDS(object = res1, paste0(path_out, "/", file_out, ".rds"))
 }
-  ### ------------------------------------------------------------------------ ###
-  ### combine and plot ####
-  ### ------------------------------------------------------------------------ ###
-  if(FALSE){output <- readRDS(paste0(path_out, "/", file_out, ".rds"))
-  # ### get stock before simulation
-  stk <- input$om@stock
-  # ### add simulated data
-  stk[, dimnames(res1@stock)$year] <- res1@stock
-  # ### save
-  saveRDS(object = stk, file = paste0(path_out,"/",file_out,"_base_full_stk.rds"))
-  
-  # ### plot
-  plot(stk, probs = c(0.05, 0.25, 0.5, 0.75, 0.95)) + 
-    xlab("year") + geom_vline(xintercept = 2018.5) +
-    geom_hline(data = data.frame(qname = "SSB", data = 94000), #blim
-               aes(yintercept = data), linetype = "dashed") +
-    geom_hline(data = data.frame(qname = "SSB", data = 132000), #bpa
-               aes(yintercept = data), linetype = "solid") +
-    geom_hline(data = data.frame(qname = "F", data = 0.38), # flim
-               aes(yintercept = data), linetype = "dashed") +
-    geom_hline(data = data.frame(qname = "F", data = 0.274), #fpa
-               aes(yintercept = data), linetype = "solid") +
-    theme_bw()
-  ggsave(filename = paste0(path_out,"/",file_out,"_base_full_stk.png"), 
-         width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
-  
-  }
+### ------------------------------------------------------------------------ ###
+### combine and plot ####
+### ------------------------------------------------------------------------ ###
+if(FALSE){output <- readRDS(paste0(path_out, "/", file_out, ".rds"))
+# ### get stock before simulation
+stk <- input$om@stock
+# ### add simulated data
+stk[, dimnames(res1@stock)$year] <- res1@stock
+# ### save
+saveRDS(object = stk, file = paste0(path_out,"/",file_out,"_base_full_stk.rds"))
 
-                                      ### ------------------------------------------------------------------------ ###
-                                      ### terminate ####
-                                      ### ------------------------------------------------------------------------ ###
-                                      
-                                      ### close R
-                                      # mpi.finalize()
-                                      ### mpi.finalize() or mpi.quit() hang...
-                                      ### -> kill R, the MPI processes stop afterwards
-                                      
-                                      ### try killing current job...
-                                      # if (par_env == 1 & exists("kill")) {
-                                      #   system("bkill $LSB_JOBID")
-                                      # }
-                                      
-                                      quit(save = "no")
-                                      
-                                      
-                                      
-                                      
+# ### plot
+plot(stk, probs = c(0.05, 0.25, 0.5, 0.75, 0.95)) + 
+  xlab("year") + geom_vline(xintercept = 2018.5) +
+  geom_hline(data = data.frame(qname = "SSB", data = 94000), #blim
+             aes(yintercept = data), linetype = "dashed") +
+  geom_hline(data = data.frame(qname = "SSB", data = 132000), #bpa
+             aes(yintercept = data), linetype = "solid") +
+  geom_hline(data = data.frame(qname = "F", data = 0.38), # flim
+             aes(yintercept = data), linetype = "dashed") +
+  geom_hline(data = data.frame(qname = "F", data = 0.274), #fpa
+             aes(yintercept = data), linetype = "solid") +
+  theme_bw()
+ggsave(filename = paste0(path_out,"/",file_out,"_base_full_stk.png"), 
+       width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
+
+}
+
+### ------------------------------------------------------------------------ ###
+### terminate ####
+### ------------------------------------------------------------------------ ###
+
+### close R
+# mpi.finalize()
+### mpi.finalize() or mpi.quit() hang...
+### -> kill R, the MPI processes stop afterwards
+
+### try killing current job...
+# if (par_env == 1 & exists("kill")) {
+#   system("bkill $LSB_JOBID")
+# }
+
+quit(save = "no")
+
+
+
