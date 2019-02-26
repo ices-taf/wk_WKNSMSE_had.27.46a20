@@ -48,7 +48,7 @@ library(tidyr)
 library(dplyr)
 
 ### load additional functions
-#setwd(paste("/home/coleh/WKNSMSE/wk_WKNSMSE_had.27.46a20", sep=""))
+setwd(paste("/home/coleh/WKNSMSE/wk_WKNSMSE_had.27.46a20", sep=""))
 source("a4a_mse_WKNSMSE_funs.R")
 invisible(lapply(list.files(path = "functions/", pattern = "*.R$", 
                             full.names = TRUE), source))
@@ -69,17 +69,35 @@ if (HCRoption %in% 1:6) {
     Ftrgt = seq(from = 0.1, to = 0.3, by = 0.1),
     Btrigger = seq(from = 120000, to = 150000, by = 10000))
   
-  # option 13:29
+  # option 13:24
   hcr_vals<-rbind(hcr_vals,
-                  expand.grid(Ftrgt = c(0.2,seq(from = 0.28, to = 0.30, by = 0.01)),
+                  expand.grid(Ftrgt = seq(from = 0.28, to = 0.30, by = 0.01),
                               Btrigger = 180000),
-                  expand.grid(Ftrgt = c(0.2,seq(from = 0.27, to = 0.29, by = 0.01),0.3),
+                  expand.grid(Ftrgt = seq(from = 0.27, to = 0.29, by = 0.01),
                               Btrigger = 170000),
-                  expand.grid(Ftrgt = c(0.2,seq(from = 0.26, to = 0.28, by = 0.01),0.3),
+                  expand.grid(Ftrgt = seq(from = 0.26, to = 0.28, by = 0.01),
                               Btrigger = 160000),
                   expand.grid(Ftrgt = seq(from = 0.25, to = 0.27, by = 0.01),
                               Btrigger = 150000)
   )
+  
+  hcr_vals<-rbind(hcr_vals,expand.grid(
+    Ftrgt = seq(from = 0.2, to = 0.3, by = 0.1),
+    Btrigger = seq(from = 160000, to = 180000, by = 10000)))
+  
+  hcr_vals<-rbind(hcr_vals,c(0.29,160000),c(0.28,150000),c(0.27,180000))
+  
+  # extra for AD
+  hcr_vals<-rbind(hcr_vals,c(0.25,140000),c(0.26,140000),c(0.24,140000))
+  
+  # extra for BE
+  hcr_vals<-rbind(hcr_vals,c(0.29,160000),c(0.28,150000),c(0.27,140000),c(0.26,140000),c(0.25,140000),c(0.24,140000))
+  
+  #extra for C
+  hcr_vals<-rbind(hcr_vals,c(0.29,160000),c(0.28,150000))
+  
+  # new for B
+  hcr_vals<-rbind(hcr_vals,c(0.31,180000),c(0.32,180000),c(0.3,190000),c(0.31, 190000),c(0.32,190000))
 }
 
 if (par_env == 1) {
@@ -109,7 +127,7 @@ if (par_env == 1) {
   library(stockassessment)
   library(foreach)
   library(doRNG)
-#  setwd(paste("/home/coleh/WKNSMSE/wk_WKNSMSE_had.27.46a20", sep=""))
+  setwd(paste("/home/coleh/WKNSMSE/wk_WKNSMSE_had.27.46a20", sep=""))
   
   source("a4a_mse_WKNSMSE_funs.R")
   invisible(lapply(list.files(path = "functions/", pattern = "*.R$", 
@@ -162,7 +180,7 @@ if (exists("HCRoption")) {
 }
 
 input_bckp <- input
-for (HCR_comb in 1:nrow(hcr_vals)) {
+for (HCR_comb in c(45,46,47,48,49,17,18,25,26,28)) {
   input <- input_bckp
   
   ### implement
