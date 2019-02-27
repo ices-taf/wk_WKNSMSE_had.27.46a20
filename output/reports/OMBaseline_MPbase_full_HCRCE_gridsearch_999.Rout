@@ -657,3 +657,157 @@ Implementing TAC constraint.
 Implementing banking and borrowing.
 
 [1] "2019-02-26 13:49:47 CET"
+
+[1] "2019-02-26 15:01:27 CET"
+
+Setting custom Btrigger/Ftrgt values.
+Using HCR_comb = 20
+Ftrgt = 0.26
+Btrigger = 160000
+
+
+Implementing TAC constraint.
+
+
+Implementing banking and borrowing.
+
+[1] "2019-02-26 15:01:30 CET"
+
+[1] "2019-02-26 16:12:35 CET"
+
+Setting custom Btrigger/Ftrgt values.
+Using HCR_comb = 21
+Ftrgt = 0.27
+Btrigger = 160000
+
+
+Implementing TAC constraint.
+
+
+Implementing banking and borrowing.
+
+[1] "2019-02-26 16:12:38 CET"
+
+[1] "2019-02-26 17:24:16 CET"
+
+Setting custom Btrigger/Ftrgt values.
+Using HCR_comb = 22
+Ftrgt = 0.28
+Btrigger = 160000
+
+
+Implementing TAC constraint.
+
+
+Implementing banking and borrowing.
+
+[1] "2019-02-26 17:24:18 CET"
+
+[1] "2019-02-26 18:35:22 CET"
+
+Setting custom Btrigger/Ftrgt values.
+Using HCR_comb = 23
+Ftrgt = 0.3
+Btrigger = 160000
+
+
+Implementing TAC constraint.
+
+
+Implementing banking and borrowing.
+
+[1] "2019-02-26 18:35:25 CET"
+
+[1] "2019-02-26 19:48:34 CET"
+
+Setting custom Btrigger/Ftrgt values.
+Using HCR_comb = 24
+Ftrgt = 0.25
+Btrigger = 150000
+
+
+Implementing TAC constraint.
+
+
+Implementing banking and borrowing.
+
+[1] "2019-02-26 19:48:37 CET"
+
+[1] "2019-02-26 21:00:23 CET"
+
+Setting custom Btrigger/Ftrgt values.
+Using HCR_comb = 25
+Ftrgt = 0.26
+Btrigger = 150000
+
+
+Implementing TAC constraint.
+
+
+Implementing banking and borrowing.
+
+[1] "2019-02-26 21:00:26 CET"
+
+[1] "2019-02-26 22:12:04 CET"
+
+Setting custom Btrigger/Ftrgt values.
+Using HCR_comb = 26
+Ftrgt = 0.27
+Btrigger = 150000
+
+
+Implementing TAC constraint.
+
+
+Implementing banking and borrowing.
+
+[1] "2019-02-26 22:12:07 CET"
+
+[1] "2019-02-26 23:23:32 CET"
+There were 26 warnings (use warnings() to see them)
+> ### ------------------------------------------------------------------------ ###
+> ### combine and plot ####
+> ### ------------------------------------------------------------------------ ###
+> if(FALSE){output <- readRDS(paste0(path_out, "/", file_out, ".rds"))
++ # ### get stock before simulation
++ stk <- input$om@stock
++ # ### add simulated data
++ stk[, dimnames(res1@stock)$year] <- res1@stock
++ # ### save
++ saveRDS(object = stk, file = paste0(path_out,"/",file_out,"_base_full_stk.rds"))
++ 
++ # ### plot
++ plot(stk, probs = c(0.05, 0.25, 0.5, 0.75, 0.95)) + 
++   xlab("year") + geom_vline(xintercept = 2018.5) +
++   geom_hline(data = data.frame(qname = "SSB", data = 94000), #blim
++              aes(yintercept = data), linetype = "dashed") +
++   geom_hline(data = data.frame(qname = "SSB", data = 132000), #bpa
++              aes(yintercept = data), linetype = "solid") +
++   geom_hline(data = data.frame(qname = "F", data = 0.38), # flim
++              aes(yintercept = data), linetype = "dashed") +
++   geom_hline(data = data.frame(qname = "F", data = 0.274), #fpa
++              aes(yintercept = data), linetype = "solid") +
++   theme_bw()
++ ggsave(filename = paste0(path_out,"/",file_out,"_base_full_stk.png"), 
++        width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
++ 
++ }
+> 
+> ### ------------------------------------------------------------------------ ###
+> ### terminate ####
+> ### ------------------------------------------------------------------------ ###
+> 
+> ### close R
+> # mpi.finalize()
+> ### mpi.finalize() or mpi.quit() hang...
+> ### -> kill R, the MPI processes stop afterwards
+> 
+> ### try killing current job...
+> # if (par_env == 1 & exists("kill")) {
+> #   system("bkill $LSB_JOBID")
+> # }
+> 
+> quit(save = "no")
+> proc.time()
+      user     system    elapsed 
+ 24551.089    920.659 111792.088 
