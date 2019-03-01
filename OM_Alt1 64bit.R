@@ -172,6 +172,7 @@ is(fit)
 fit
 
 ### extract model parameters and use them in the simulation as starting values
+
 sam_initial <- sam_getpar(fit)
 sam_initial$logScale <- numeric(0)
 
@@ -312,7 +313,7 @@ rm(list=c("discards.wt_stf","landings.wt_stf","catch.wt_stf","stock.wt_stf","har
 ### use only data from 2000
 sr <- as.FLSR(window(stk_stf, start = min(rec.period)), model = "segreg")
 ### fit model individually to each iteration and suppress output to screen
-suppressWarnings(. <- capture.output(sr <- fmle(sr,fixed=list(b=94000))))
+suppressWarnings(. <- capture.output(sr <- fmle(sr)))
 ### run in parallel
 # library(doParallel)
 # cl <- makeCluster(10)
@@ -427,7 +428,7 @@ if(doPlot){
   ggsave(paste0("output/had4/OM_plots/OM_",omName,"_",stkname,"_recruitment - diagnostics ECD.png"), height=4.5, width=6,dpi=600)
   
   
-  #rm(test, i_samp)
+  rm(test, i_samp)
 }
 
 ### generate residuals for MSE
@@ -535,7 +536,7 @@ layout(cbind(c(1,2,3),c(4,5,6)))
   ggplot(data=iter(sr_res,i_samp), aes(year, data)) + geom_line(aes(group=iter, colour=factor(iter))) + 
     facet_wrap(~iter, scales="free", nrow=5) + theme(legend.position = "none") 
   
-  ggsave(paste0("output/had4/OM_plots/OM_",omName,"_",stkname,"_recruitment - worm plot.png"), height=4.5, width=6,dpi=600)
+  ggsave(paste0("output/had4/OM_plots/OM_",omName,"_",stkname,"_recruitment - worm plot.png"), height=4.5, width=6,dpi=300)
   
   
   }
