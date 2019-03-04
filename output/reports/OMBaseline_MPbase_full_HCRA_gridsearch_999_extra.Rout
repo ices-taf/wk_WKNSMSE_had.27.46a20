@@ -1,0 +1,192 @@
+> ### ------------------------------------------------------------------------ ###
+> ### R script to run WKNSMSE had MSE on HPC ####
+> ### ------------------------------------------------------------------------ ###
+> ### This is designed to be called by a job submission script
+> ### run_mse.qsub for systems using PBS and the qsub commands
+> ### run_mse.bsub for system using LSF and the bsub commands
+> 
+> 
+> ### ------------------------------------------------------------------------ ###
+> ### load arguments from job script ####
+> ### ------------------------------------------------------------------------ ###
+> 
+> ### load arguments
+> args <- commandArgs(TRUE)
+> print("arguments passed on to this script:")
+[1] "arguments passed on to this script:"
+> print(args)
+[1] "iters=999"     "years=20"      "nblocks=200"   "par_env=2"    
+[5] "n_workers=200" "HCRoption=1"  
+> 
+> ### evaluate arguments, if they are passed to R:
+> if (length(args) > 0) {
++   
++   ### extract arguments
++   for (i in seq_along(args)) eval(parse(text = args[[i]]))
++   
++   ### parallelisation environment
++   if (!exists("par_env")) par_env <- 1
++   if (!exists("n_workers")) n_workers <- 1
++   
++ } else {
++   
++   stop("no argument passed to R")
++   
++ }
+> 
+> ### ------------------------------------------------------------------------ ###
+> ### set up environment ####
+> ### ------------------------------------------------------------------------ ###
+> 
+> ### load packages
+> library(FLfse)
+Loading required package: FLCore
+Loading required package: lattice
+Loading required package: iterators
+FLCore (Version 2.6.12, packaged: 2019-01-22 16:23:11 UTC)
+Loading required package: foreach
+> library(stockassessment)
+> library(ggplotFL)
+Loading required package: ggplot2
+
+Attaching package: ‘ggplot2’
+
+The following object is masked from ‘package:FLCore’:
+
+    %+%
+
+Warning message:
+replacing previous import ‘ggplot2::%+%’ by ‘FLCore::%+%’ when loading ‘ggplotFL’ 
+> library(FLAssess)
+> library(mse)
+Loading required package: data.table
+Loading required package: FLash
+
+Attaching package: ‘FLash’
+
+The following object is masked from ‘package:FLAssess’:
+
+    stf
+
+Loading required package: FLBRP
+
+Attaching package: ‘FLBRP’
+
+The following object is masked from ‘package:stockassessment’:
+
+    ypr
+
+
+Attaching package: ‘mse’
+
+The following object is masked from ‘package:FLBRP’:
+
+    refpts<-
+
+The following object is masked from ‘package:base’:
+
+    args
+
+> ### load files from package mse for easier debugging
+> #devtools::load_all("../mse/")
+> library(FLash)
+> library(tidyr)
+
+Attaching package: ‘tidyr’
+
+The following objects are masked from ‘package:FLCore’:
+
+    expand, spread
+
+> library(dplyr)
+
+Attaching package: ‘dplyr’
+
+The following objects are masked from ‘package:data.table’:
+
+    between, first, last
+
+The following objects are masked from ‘package:FLCore’:
+
+    combine, desc, n
+
+The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+> 
+> ### load additional functions
+> source("a4a_mse_WKNSMSE_funs.R")
+> invisible(lapply(list.files(path = "functions/", pattern = "*.R$", 
++                             full.names = TRUE), source))
+> path_out <- paste0("output/had4/runs/", iters, "_", years)
+> ### ------------------------------------------------------------------------ ###
+> ### setup parallel environment ####
+> ### ------------------------------------------------------------------------ ###
+> ### par_env=1 -> MPI (Rmpi, DoMPI)
+> ### par_env=2 -> DoParallel
+> 
+> ### ------------------------------------------------------------------------ ###
+> ### set HCR parameters 
+> ### ------------------------------------------------------------------------ ###
+> 
+> if (HCRoption %in% 1:6) {
++   
++ 
++   # options for extra A (sensitivity and robustness)
++ 
++   #optimised pair
++   optimF<-0.28
++   optimB<-160000
++   Fmsy<-0.194
++   Fmsylower<-0.167
++   Fmsyupper<-0.194
++   Bmsy<-132000
++   
++   # 0.9 *Ftrgt
++   hcr_vals<-data.frame(Ftrgt=0.9*optimF,Btrigger=optimB)
++   
++   # 1.1*Ftrgt
++   hcr_vals<-rbind(hcr_vals,c(1.1*optimF,optimB))
++   
++   # Fmsylower
++   hcr_vals<-rbind(hcr_vals,c(Fmsylower,optimB))
++   
++   # Fmsyupper
++   hcr_vals<-rbind(hcr_vals,c(Fmsyupper,optimB))
++   
++   # 1.5*Btrigger
++   hcr_vals<-rbind(hcr_vals,c(optimF,optimB*1.5))
++   
++   # 2*Btrigger
++   hcr_vals<-rbind(hcr_vals,c(optimF,optimB*2))
++   
++   # A*
++   hcr_vals<-rbind(hcr_vals,c(Fmsy,Bmsy))
++   
++ }
+> 
+> if (par_env == 1) {
++   
++   library(doMPI)
++   cl <- startMPIcluster()
++   registerDoMPI(cl)
++   cl_length <- cl$workerCount
++   
++ } else if (par_env == 2) {
++   
++   library(doParallel)
++   cl <- makeCluster(n_workers)
++   registerDoParallel(cl)
++   cl_length <- length(cl)
++   
++ }
+Loading required package: parallel
+
+Execution halted
+
+Execution halted

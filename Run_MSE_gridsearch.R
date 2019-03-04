@@ -48,10 +48,6 @@ library(tidyr)
 library(dplyr)
 
 ### load additional functions
-<<<<<<< HEAD
-setwd(paste("/home/coleh/WKNSMSE/wk_WKNSMSE_had.27.46a20", sep=""))
-=======
->>>>>>> ad4c7ac2220da41d61c9c42b05332ea08f224bb3
 source("a4a_mse_WKNSMSE_funs.R")
 invisible(lapply(list.files(path = "functions/", pattern = "*.R$", 
                             full.names = TRUE), source))
@@ -130,10 +126,6 @@ if (par_env == 1) {
   library(stockassessment)
   library(foreach)
   library(doRNG)
-<<<<<<< HEAD
-  setwd(paste("/home/coleh/WKNSMSE/wk_WKNSMSE_had.27.46a20", sep=""))
-=======
->>>>>>> ad4c7ac2220da41d61c9c42b05332ea08f224bb3
   
   source("a4a_mse_WKNSMSE_funs.R")
   invisible(lapply(list.files(path = "functions/", pattern = "*.R$", 

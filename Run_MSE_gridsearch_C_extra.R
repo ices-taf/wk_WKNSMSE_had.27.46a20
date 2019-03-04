@@ -48,7 +48,6 @@ library(tidyr)
 library(dplyr)
 
 ### load additional functions
-setwd(paste("/home/coleh/WKNSMSE/wk_WKNSMSE_had.27.46a20", sep=""))
 source("a4a_mse_WKNSMSE_funs.R")
 invisible(lapply(list.files(path = "functions/", pattern = "*.R$", 
                             full.names = TRUE), source))
@@ -127,7 +126,6 @@ if (par_env == 1) {
   library(stockassessment)
   library(foreach)
   library(doRNG)
-  setwd(paste("/home/coleh/WKNSMSE/wk_WKNSMSE_had.27.46a20", sep=""))
   
   source("a4a_mse_WKNSMSE_funs.R")
   invisible(lapply(list.files(path = "functions/", pattern = "*.R$", 

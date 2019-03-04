@@ -1,0 +1,108 @@
+> ### ------------------------------------------------------------------------ ###
+> ### R script to run WKNSMSE had MSE on HPC ####
+> ### ------------------------------------------------------------------------ ###
+> ### This is designed to be called by a job submission script
+> ### run_mse.qsub for systems using PBS and the qsub commands
+> ### run_mse.bsub for system using LSF and the bsub commands
+> 
+> 
+> ### ------------------------------------------------------------------------ ###
+> ### load arguments from job script ####
+> ### ------------------------------------------------------------------------ ###
+> 
+> ### load arguments
+> args <- commandArgs(TRUE)
+> print("arguments passed on to this script:")
+[1] "arguments passed on to this script:"
+> print(args)
+[1] "iters=1000"    "years=20"      "nblocks=200"   "par_env=2"    
+[5] "n_workers=200" "HCRoption=1"  
+> 
+> ### evaluate arguments, if they are passed to R:
+> if (length(args) > 0) {
++   
++   ### extract arguments
++   for (i in seq_along(args)) eval(parse(text = args[[i]]))
++   
++   ### parallelisation environment
++   if (!exists("par_env")) par_env <- 1
++   if (!exists("n_workers")) n_workers <- 1
++   
++ } else {
++   
++   stop("no argument passed to R")
++   
++ }
+> 
+> ### ------------------------------------------------------------------------ ###
+> ### set up environment ####
+> ### ------------------------------------------------------------------------ ###
+> 
+> ### load packages
+> library(FLfse)
+Loading required package: FLCore
+Loading required package: lattice
+Loading required package: iterators
+FLCore (Version 2.6.12, packaged: 2019-02-18 08:43:21 UTC)
+Loading required package: foreach
+> library(stockassessment)
+> library(ggplotFL)
+Loading required package: ggplot2
+
+Attaching package: ‘ggplot2’
+
+The following object is masked from ‘package:FLCore’:
+
+    %+%
+
+Warning message:
+replacing previous import ‘ggplot2::%+%’ by ‘FLCore::%+%’ when loading ‘ggplotFL’ 
+> library(FLAssess)
+> library(mse)
+Loading required package: data.table
+Loading required package: FLash
+Loading required package: FLBRP
+
+Attaching package: ‘FLBRP’
+
+The following object is masked from ‘package:stockassessment’:
+
+    ypr
+
+> ### load files from package mse for easier debugging
+> #devtools::load_all("../mse/")
+> library(FLash)
+> library(tidyr)
+
+Attaching package: ‘tidyr’
+
+The following objects are masked from ‘package:FLCore’:
+
+    expand, spread
+
+> library(dplyr)
+
+Attaching package: ‘dplyr’
+
+The following objects are masked from ‘package:data.table’:
+
+    between, first, last
+
+The following objects are masked from ‘package:FLCore’:
+
+    combine, desc, n
+
+The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+> 
+> ### load additional functions
+> setwd(paste("/home/coleh/WKNSMSE/wk_WKNSMSE_had.27.46a20", sep=""))
+Error in setwd(paste("/home/coleh/WKNSMSE/wk_WKNSMSE_had.27.46a20", sep = "")) : 
+  cannot change working directory
+Execution halted
