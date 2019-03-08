@@ -43,7 +43,7 @@
 Loading required package: FLCore
 Loading required package: lattice
 Loading required package: iterators
-FLCore (Version 2.6.12, packaged: 2019-02-18 08:43:21 UTC)
+FLCore (Version 2.6.12, packaged: 2019-01-22 16:23:11 UTC)
 Loading required package: foreach
 > library(stockassessment)
 > library(ggplotFL)
@@ -61,6 +61,13 @@ replacing previous import ‘ggplot2::%+%’ by ‘FLCore::%+%’ when loading �
 > library(mse)
 Loading required package: data.table
 Loading required package: FLash
+
+Attaching package: ‘FLash’
+
+The following object is masked from ‘package:FLAssess’:
+
+    stf
+
 Loading required package: FLBRP
 
 Attaching package: ‘FLBRP’
@@ -68,6 +75,17 @@ Attaching package: ‘FLBRP’
 The following object is masked from ‘package:stockassessment’:
 
     ypr
+
+
+Attaching package: ‘mse’
+
+The following object is masked from ‘package:FLBRP’:
+
+    refpts<-
+
+The following object is masked from ‘package:base’:
+
+    args
 
 > ### load files from package mse for easier debugging
 > #devtools::load_all("../mse/")
@@ -102,7 +120,337 @@ The following objects are masked from ‘package:base’:
 
 > 
 > ### load additional functions
-> setwd(paste("/home/coleh/WKNSMSE/wk_WKNSMSE_had.27.46a20", sep=""))
-Error in setwd(paste("/home/coleh/WKNSMSE/wk_WKNSMSE_had.27.46a20", sep = "")) : 
-  cannot change working directory
-Execution halted
+> #setwd(paste("/home/coleh/WKNSMSE/wk_WKNSMSE_had.27.46a20", sep=""))
+> source("a4a_mse_WKNSMSE_funs.R")
+> invisible(lapply(list.files(path = "functions/", pattern = "*.R$", 
++                             full.names = TRUE), source))
+> #path_out <- paste0("output/had4/runs/", iters, "_", years)
+> ### ------------------------------------------------------------------------ ###
+> ### setup parallel environment ####
+> ### ------------------------------------------------------------------------ ###
+> ### par_env=1 -> MPI (Rmpi, DoMPI)
+> ### par_env=2 -> DoParallel
+> 
+> ### ------------------------------------------------------------------------ ###
+> ### set HCR parameters 
+> ### ------------------------------------------------------------------------ ###
+> 
+> if (HCRoption %in% 1:6) {
++   
++ 
++   # options for extra A (sensitivity and robustness)
++ 
++   #optimised pair
++   optimF<-0.28
++   optimB<-160000
++   #Fmsy<-0.194
++   #Fmsylower<-0.167
++   #Fmsyupper<-0.194
++   #Bmsy<-132000
++   
++   # 0.9 *Ftrgt
++   hcr_vals<-data.frame(Ftrgt=optimF,Btrigger=optimB)
++   
++   
++ }
+> 
+> if (par_env == 1) {
++   
++   library(doMPI)
++   cl <- startMPIcluster()
++   registerDoMPI(cl)
++   cl_length <- cl$workerCount
++   
++ } else if (par_env == 2) {
++   
++   library(doParallel)
++   cl <- makeCluster(n_workers)
++   registerDoParallel(cl)
++   cl_length <- length(cl)
++   
++ }
+Loading required package: parallel
+> 
+> 
+> #if(FALSE){  
+> ### load packages and functions into workers
+> . <- foreach(i = seq(cl_length)) %dopar% {
++   #devtools::load_all("../mse/")
++   library(mse)
++   library(FLash)
++   library(FLfse)
++   library(stockassessment)
++   library(foreach)
++   library(doRNG)
++  # setwd(paste("/home/coleh/WKNSMSE/wk_WKNSMSE_had.27.46a20", sep=""))
++   
++   source("a4a_mse_WKNSMSE_funs.R")
++   invisible(lapply(list.files(path = "functions/", pattern = "*.R$", 
++                               full.names = TRUE), source))
++ }
+> 
+> ### set random seed for reproducibility
+> library(doRNG)
+Loading required package: rngtools
+Loading required package: pkgmaker
+Loading required package: registry
+
+Attaching package: ‘pkgmaker’
+
+The following object is masked from ‘package:base’:
+
+    isFALSE
+
+> registerDoRNG(123)
+> # }
+> ### ------------------------------------------------------------------------ ###
+> ### load data for MSE ####
+> ### ------------------------------------------------------------------------ ###
+> 
+> ### data path
+> path_data <- paste0("input/had4/")
+> 
+> omName<-"Alt1"
+> MPrunName<-"Base"
+> n<-iters
+> 
+> ### load input objects
+> input<-readRDS(file = paste0(path_data,"/MP_base/MP",MPrunName,"_OM",omName,"_",n,".rds"))
+> 
+> ### modify input for running in parallel
+> input$genArgs$nblocks <- nblocks
+> 
+> 
+> 
+> ### ------------------------------------------------------------------------ ###
+> ### set HCR option: A, B, C
+> if (exists("HCRoption")) {
++   
++   input$ctrl.mp$ctrl.hcr@args$option <- switch(HCRoption, 
++                                                "1" = "A", 
++                                                "2" = "B", 
++                                                "3" = "C",
++                                                "4" = "A",
++                                                "5" = "B",
++                                                "6" = "C")
++   
++   cat(paste0("\nSetting custom HCR option: HCRoption = ", HCRoption, 
++              " => HCR ", input$ctrl.mp$ctrl.hcr@args$option, "\n\n"))
++   
++ } else {
++   
++   cat(paste0("\nUsing default HCR option: HCR ", 
++              input$ctrl.mp$ctrl.hcr@args$option, "\n\n"))
++   HCRoption <- 0
++ }
+
+Setting custom HCR option: HCRoption = 3 => HCR C
+
+> 
+> input_bckp <- input
+> for (HCR_comb in 1:nrow(hcr_vals)) {
++   input <- input_bckp
++   
++   ### implement
++   if (exists("HCR_comb")) {
++     
++     ### set Btrigger
++     Btrigger <- hcr_vals[HCR_comb, "Btrigger"]
++     input$ctrl.mp$ctrl.phcr@args$Btrigger <- Btrigger
++     input$ctrl.mp$ctrl.is@args$hcrpars$Btrigger <- Btrigger
++     
++     ### set Ftrgt
++     Ftrgt <- hcr_vals[HCR_comb, "Ftrgt"]
++     input$ctrl.mp$ctrl.phcr@args$Ftrgt <- Ftrgt
++     input$ctrl.mp$ctrl.is@args$hcrpars$Ftrgt <- Ftrgt
++     
++     cat(paste0("\nSetting custom Btrigger/Ftrgt values.\n",
++                "Using HCR_comb = ", HCR_comb, "\n",
++                "Ftrgt = ", Ftrgt, "\n",
++                "Btrigger = ", Btrigger, "\n\n"))
++     
++   } else {
++     input$ctrl.mp$ctrl.phcr@args$Ftrgt <- Ftrgt
++     input$ctrl.mp$ctrl.is@args$hcrpars$Ftrgt <- Ftrgt
++     input$ctrl.mp$ctrl.phcr@args$Btrigger <- Btrigger
++     input$ctrl.mp$ctrl.is@args$hcrpars$Btrigger <- Btrigger
++     
++     cat(paste0("\nUsing default Btrigger/Ftrgt values.\n",
++                "Ftrgt = ", input$ctrl.mp$ctrl.phcr@args$Ftrgt, "\n",
++                "Btrigger = ", input$ctrl.mp$ctrl.phcr@args$Btrigger, "\n\n"))
++     
++   }
++   
++   ### ------------------------------------------------------------------------ ###
++   ## TAC constraint
++   input$ctrl.mp$ctrl.is@args$TAC_constraint <- FALSE
++   ### check conditions
++   ### either manually requested or as part of HCR options 4-6 
++   if (exists("TAC_constraint")) {
++     
++     if (isTRUE(as.logical(TAC_constraint))) {
++       input$ctrl.mp$ctrl.is@args$TAC_constraint <- TRUE
++     }
++   }
++   if (HCRoption %in% 4:6) {
++     input$ctrl.mp$ctrl.is@args$TAC_constraint <- TRUE
++   }
++   ### implement
++   if (isTRUE(input$ctrl.mp$ctrl.is@args$TAC_constraint)) {
++     
++     input$ctrl.mp$ctrl.is@args$lower <- 80
++     input$ctrl.mp$ctrl.is@args$upper <- 125
++     input$ctrl.mp$ctrl.is@args$Btrigger_cond <- TRUE
++     
++     cat(paste0("\nImplementing TAC constraint.\n\n"))
++     
++   } else {
++     
++     cat(paste0("\nTAC constraint NOT implemented.\n\n"))
++     
++   }
++   
++   
++   ### ------------------------------------------------------------------------ ###
++   ### banking & borrowing
++   ### banking & borrowing
++   input$ctrl.mp$ctrl.is@args$BB <- FALSE
++   input$iem <- NULL
++   
++   ### check conditions
++   ### either manually requested or as part of HCR options 4-6 
++   if (exists("BB")) {
++     if (isTRUE(as.logical(BB))) {
++       
++       input$iem <- FLiem(method = iem_WKNSMSE, args = list(BB = TRUE))
++       input$ctrl.mp$ctrl.is@args$BB <- TRUE
++       input$ctrl.mp$ctrl.is@args$BB_check_hcr <- TRUE
++       input$ctrl.mp$ctrl.is@args$BB_check_fc <- TRUE
++       input$ctrl.mp$ctrl.is@args$BB_rho <- c(-0.1, 0.1)
++       
++     }
++     
++   }
++   if (HCRoption %in% 4:6) {
++     
++     input$iem <- FLiem(method = iem_WKNSMSE, args = list(BB = TRUE))
++     input$ctrl.mp$ctrl.is@args$BB <- TRUE
++     input$ctrl.mp$ctrl.is@args$BB_rho <- c(-0.1, 0.1)
++     input$ctrl.mp$ctrl.is@args$BB_check_hcr <- FALSE
++     input$ctrl.mp$ctrl.is@args$BB_check_fc <- FALSE
++     
++     if (HCRoption %in% 4) {
++       
++       input$ctrl.mp$ctrl.is@args$BB_check_hcr <- TRUE
++       
++     } else if (HCRoption %in% 5:6) {
++       
++       input$ctrl.mp$ctrl.is@args$BB_check_fc <- TRUE
++       
++     }
++     
++   }
++   
++   if (!is.null(input$iem)) {
++     
++     cat(paste0("\nImplementing banking and borrowing.\n\n"))
++     
++   } else {
++     
++     cat(paste0("\nBanking and borrowing NOT implemented.\n\n"))
++     
++   }
++   
++   
++   ### ------------------------------------------------------------------------ ###
++   ### run MSE ####
++   ### ------------------------------------------------------------------------ ###
++   #debugonce(mse:::goFish)
++   print(Sys.time())
++   ### run MSE
++   res1 <- mp(om = input$om,
++              oem = input$oem,
++              iem = input$iem,
++              ctrl.mp = input$ctrl.mp,
++              genArgs = input$genArgs,
++              tracking = input$tracking)
++   
++   print(Sys.time())
++   
++   ### save results
++   path_out <- paste0("output/had4/runs/",omName,"/", n, "_", years)
++   
++   dir.create(path = path_out, recursive = TRUE)
++   file_out <- paste0("HCR-", input$ctrl.mp$ctrl.hcr@args$option,
++                      "_Ftrgt-", input$ctrl.mp$ctrl.phcr@args$Ftrgt,
++                      "_Btrigger-", input$ctrl.mp$ctrl.phcr@args$Btrigger,
++                      "_TACconstr-", input$ctrl.mp$ctrl.is@args$TAC_constraint,
++                      "_BB-", input$ctrl.mp$ctrl.is@args$BB
++   )
++   
++   saveRDS(object = res1, paste0(path_out, "/", file_out, ".rds"))
++ }
+
+Setting custom Btrigger/Ftrgt values.
+Using HCR_comb = 1
+Ftrgt = 0.28
+Btrigger = 160000
+
+
+TAC constraint NOT implemented.
+
+
+Banking and borrowing NOT implemented.
+
+[1] "2019-03-07 17:22:46 CET"
+
+[1] "2019-03-07 18:30:16 CET"
+Warning message:
+In dir.create(path = path_out, recursive = TRUE) :
+  'output/had4/runs/Alt1/1000_20' already exists
+> ### ------------------------------------------------------------------------ ###
+> ### combine and plot ####
+> ### ------------------------------------------------------------------------ ###
+> if(FALSE){output <- readRDS(paste0(path_out, "/", file_out, ".rds"))
++ # ### get stock before simulation
++ stk <- input$om@stock
++ # ### add simulated data
++ stk[, dimnames(res1@stock)$year] <- res1@stock
++ # ### save
++ saveRDS(object = stk, file = paste0(path_out,"/",file_out,"_base_full_stk.rds"))
++ 
++ # ### plot
++ plot(stk, probs = c(0.05, 0.25, 0.5, 0.75, 0.95)) + 
++   xlab("year") + geom_vline(xintercept = 2018.5) +
++   geom_hline(data = data.frame(qname = "SSB", data = 94000), #blim
++              aes(yintercept = data), linetype = "dashed") +
++   geom_hline(data = data.frame(qname = "SSB", data = 132000), #bpa
++              aes(yintercept = data), linetype = "solid") +
++   geom_hline(data = data.frame(qname = "F", data = 0.38), # flim
++              aes(yintercept = data), linetype = "dashed") +
++   geom_hline(data = data.frame(qname = "F", data = 0.274), #fpa
++              aes(yintercept = data), linetype = "solid") +
++   theme_bw()
++ ggsave(filename = paste0(path_out,"/",file_out,"_base_full_stk.png"), 
++        width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
++ 
++ }
+> 
+> ### ------------------------------------------------------------------------ ###
+> ### terminate ####
+> ### ------------------------------------------------------------------------ ###
+> 
+> ### close R
+> # mpi.finalize()
+> ### mpi.finalize() or mpi.quit() hang...
+> ### -> kill R, the MPI processes stop afterwards
+> 
+> ### try killing current job...
+> # if (par_env == 1 & exists("kill")) {
+> #   system("bkill $LSB_JOBID")
+> # }
+> 
+> quit(save = "no")
+> proc.time()
+    user   system  elapsed 
+ 243.212   26.341 4117.943 
