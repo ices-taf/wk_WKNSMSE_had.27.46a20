@@ -34,20 +34,20 @@ setMethod(f = "calc_survey",
           signature = signature(stk = "FLStock", idx = "FLIndices"),
           definition = function(stk, idx, use_q = TRUE, use_time = TRUE) {
             
-  ### apply function to every element of FLIndices
-  lapply(X = idx, FUN = calc_survey_ind, stk = stk, use_q = use_q, 
-         use_time = use_time)
+            ### apply function to every element of FLIndices
+            lapply(X = idx, FUN = calc_survey_ind, stk = stk, use_q = use_q, 
+                   use_time = use_time)
             
-})
+          })
 ### stk = FLStock, idx = FLIndex
 #' @rdname calc_survey
 setMethod(f = "calc_survey",
           signature = signature(stk = "FLStock", idx = "FLIndex"),
           definition = function(stk, idx, use_q = TRUE, use_time = TRUE) {
             
-  calc_survey_ind(stk = stk, idx = idx, use_q = use_q, use_time = use_time)
+            calc_survey_ind(stk = stk, idx = idx, use_q = use_q, use_time = use_time)
             
-})
+          })
 
 
 
@@ -104,14 +104,23 @@ oem_WKNSMSE <- function(stk,
                         use_catch_residuals = FALSE, ### use residuals for
                         use_idx_residuals = FALSE,   ### observations
                         use_stk_oem = FALSE, ### biological parameters, wts etc
+                        dd_M = NULL,
                         ...) {
   #browser()
   ### current (assessment) year
   ay <- genArgs$ay
   
+  
+  ### Density-dependent M
+  # Calculate 3-year means of M from the OM on key-run years
+  # to simulate the SAM process
+  if (!is.null(dd_M) & (ay %% 3 == 1)) {
+    m(observations$stk)[, ac(ay:(ay+2))] <- yearMeans(m(stk)[, ac((ay-3):(ay-1))])
+  }
+  
   ### create object for observed stock
   if (!isTRUE(use_stk_oem)) {
-  
+    
     ### use OM as template
     stk0 <- stk
     
@@ -272,7 +281,9 @@ SAM_wrapper <- function(stk, idx, tracking,
     
     ### check how to do forecast
     ### currently, can only do F status quo
-    if (fwd_trgt != "fsq") stop("only fsq supported in forecast")
+    if (!all(fwd_trgt %in% c("fsq","TAC"))) {
+      stop("only fsq and TAC supported in forecast")
+    }
     
     ### years for average values
     ave.years <- range(stk0)[["maxyear"]] + fwd_yrs_average
@@ -298,38 +309,63 @@ SAM_wrapper <- function(stk, idx, tracking,
       class(fit) <- "sam_list"
     }
     
-    ### do forecast for all iterations
-    fc <- foreach(fit_i = fit, .errorhandling = "pass") %do% {
-      
-      ### overwrite landing fraction with last year, if requested
-      if (!is.null(fwd_yrs_lf_remove)) {
-        ### index for years to remove/overwrite
-        idx_remove <- nrow(fit_i$data$landFrac) + args$fwd_yrs_lf_remove
-        ### overwrite
-        fit_i$data$landFrac[idx_remove, ] <- fit_i$data$landFrac[rep(nrow(fit_i$data$landFrac), length(idx_remove)), ]
-      }
-      
-      ### run forecast
-      fc_i <- stockassessment::forecast(fit = fit_i, fscale = rep(1, fwd_yrs),
-                                        ave.years = ave.years,
-                                        rec.years = rec.years,
-                                        overwriteSelYears = overwriteSelYears,
-                                        splitLD = fwd_splitLD)
-      
-      ### get numbers at age for all forecast years
-      numbers <- lapply(seq(fwd_yrs), function(x) {
-        ### index for numbers at age
-        idx <- seq(length(fit_i$conf$keyLogFsta[1, ]))
-        ### get simulated numbers
-        n <- exp(fc_i[[x]]$sim[, idx])
-        ### median
-        apply(n, 2, median)
-      })
-      numbers <- do.call(cbind, numbers)
-      
-      return(list(stock.n = numbers))
-      
+    ### template for forecast targets
+    fscale <- ifelse(fwd_trgt == "fsq", 1, NA)
+    catchval <- ifelse(fwd_trgt == "TAC", -1, NA)
+    ### recycle target if neccessary
+    if (fwd_yrs > length(fwd_trgt)) {
+      fscale <- c(fscale, tail(fscale, 1))
+      catchval <- c(catchval, tail(catchval, 1))
     }
+    ### get recent TAC
+    if (genArgs$iy == ay) {
+      ### in first year of simulation, use value from OM saved earlier in ay
+      TAC_last <- tracking["metric.is", ac(ay)]
+    } else {
+      ### in following years, use TAC advised the year before
+      TAC_last <- tracking["metric.is", ac(ay - 1)]
+    }
+    
+    ### do forecast for all iterations
+    fc <- foreach(fit_i = fit, iter_i = seq_along(fit),
+                  .errorhandling = "pass") %do% {
+                    
+                    ### overwrite landing fraction with last year, if requested
+                    if (!is.null(fwd_yrs_lf_remove)) {
+                      ### index for years to remove/overwrite
+                      idx_remove <- nrow(fit_i$data$landFrac) + args$fwd_yrs_lf_remove
+                      ### overwrite
+                      fit_i$data$landFrac[idx_remove, ] <- fit_i$data$landFrac[rep(nrow(fit_i$data$landFrac), length(idx_remove)), ]
+                    }
+                    
+                    ### define forecast targets for current iteration
+                    fscale_i <- fscale
+                    ### load TAC as catch target
+                    catchval_i <- ifelse(catchval == -1, c(TAC_last[,,,,, iter_i]), catchval)
+                    
+                    ### run forecast
+                    fc_i <- stockassessment::forecast(fit = fit_i, 
+                                                      fscale = fscale_i, 
+                                                      catchval = catchval_i,
+                                                      ave.years = ave.years,
+                                                      rec.years = rec.years,
+                                                      overwriteSelYears = overwriteSelYears,
+                                                      splitLD = fwd_splitLD)
+                    
+                    ### get numbers at age for all forecast years
+                    numbers <- lapply(seq(fwd_yrs), function(x) {
+                      ### index for numbers at age
+                      idx <- seq(length(fit_i$conf$keyLogFsta[1, ]))
+                      ### get simulated numbers
+                      n <- exp(fc_i[[x]]$sim[, idx])
+                      ### median
+                      apply(n, 2, median)
+                    })
+                    numbers <- do.call(cbind, numbers)
+                    
+                    return(list(stock.n = numbers))
+                    
+                  }
     ### if forecast failed for a iteration, the list element will for this
     ### iteration will be an error message
     
@@ -358,21 +394,22 @@ SAM_wrapper <- function(stk, idx, tracking,
     m.spwn(stk0)[, ac(yrs_fill)] <- yearMeans(m.spwn(stk0)[, ac(ave.years)])
     harvest(stk0)[, ac(yrs_fill)] <- yearMeans(harvest(stk0)[, ac(ave.years)])
     
-    #ssb(stk0)
-    
     ### PLEASE NOTE:
     ### SSB value slightly different from SSB value generated from SAM:
     ### SAM calculates SSB per simulation and gives median
     ### here: calculate median of numbers at age and calculate SSB from
     ###       median numbers
     
-    ### ISSUES: forecast fails if SAM did not converge, creates error and stops
-    ### 
-    
   }
   
   ### save convergence for all iterations
-  tracking["conv.est", ac(ay)] <- sapply(fit, function(x) x$opt$convergence)
+  tracking["conv.est", ac(ay)] <- sapply(fit, function(x) {
+    if (isTRUE(is(x, "sam"))) {
+      return(x$opt$convergence)
+    } else {
+      return(2)
+    }
+  })
   ### add perceived F and SSB
   ### done in mp()
   #tracking["F.est", ac(ay)] <- fbar(stk0)[, ac(ay - 1)]
@@ -561,47 +598,62 @@ is_WKNSMSE <- function(stk, tracking, ctrl,
     
   }
   
+  ### get recent TAC
+  if (genArgs$iy == ay) {
+    ### in first year of simulation, use value from OM saved earlier in ay
+    TAC_last <- tracking["metric.is", ac(ay)]
+  } else {
+    ### in following years, use TAC advised the year before
+    TAC_last <- tracking["metric.is", ac(ay - 1)]
+  }
+  
   ### go through all model fits
   fc <- foreach(fit_i = fit, iter_i = seq_along(fit), 
                 .errorhandling = "pass") %do% {
                   
-    ### overwrite landing fraction with last year, if requested
-    if (!is.null(fwd_yrs_lf_remove)) {
-      ### index for years to remove/overwrite
-      idx_remove <- nrow(fit_i$data$landFrac) + fwd_yrs_lf_remove
-      ### overwrite
-      fit_i$data$landFrac[idx_remove, ] <- fit_i$data$landFrac[rep(nrow(fit_i$data$landFrac), length(idx_remove)), ]
-    }
-    
-    ### check how to do forecast
-    ### currently, can only do F status quo and F target from ctrl object
-    fscale <- ifelse(fwd_trgt == "fsq", 1, NA) ### scaled Fsq
-    ### target F values
-    fval <- ifelse(fwd_trgt == "hcr", ctrl@trgtArray[, "val", iter_i], NA) 
-    
-    ### years for average values
-    ave.years <- max(fit_i$data$years) + fwd_yrs_average
-    ### years for sampling of recruitment years
-    if (is.null(fwd_yrs_rec_start)) {
-      rec.years <- fit_i$data$years ### use all years, if not defined
-    } else {
-      rec.years <- seq(from = fwd_yrs_rec_start, max(fit_i$data$years))
-    }
-    
-    ### years where selectivity is not used for mean in forecast
-    overwriteSelYears <- max(fit_i$data$years) + fwd_yrs_sel
-    
-    ### forecast 
-    fc_i <- stockassessment::forecast(fit = fit_i, fscale = fscale, fval = fval,
-                                      ave.years = ave.years,
-                                      rec.years = rec.years,
-                                      overwriteSelYears = overwriteSelYears,
-                                      splitLD = fwd_splitLD)
-    
-    ### return forecast table
-    return(attr(fc_i, "tab"))#[ac(ay + 1), "catch:median"])
-    
-  }
+                  ### overwrite landing fraction with last year, if requested
+                  if (!is.null(fwd_yrs_lf_remove)) {
+                    ### index for years to remove/overwrite
+                    idx_remove <- nrow(fit_i$data$landFrac) + fwd_yrs_lf_remove
+                    ### overwrite
+                    fit_i$data$landFrac[idx_remove, ] <- fit_i$data$landFrac[rep(nrow(fit_i$data$landFrac), length(idx_remove)), ]
+                  }
+                  
+                  ### check how to do forecast
+                  ### can handle F status quo, F target from ctrl object and TAC
+                  ### scaled F
+                  fscale <- ifelse(fwd_trgt == "fsq", 1, NA)
+                  ### target F values
+                  fval <- ifelse(fwd_trgt == "hcr", ctrl@trgtArray[, "val", iter_i], NA)
+                  ### target catch values
+                  catchval <- ifelse(fwd_trgt == "TAC", c(TAC_last[,,,,, iter_i]), NA)
+                  
+                  ### years for average values
+                  ave.years <- max(fit_i$data$years) + fwd_yrs_average
+                  ### years for sampling of recruitment years
+                  if (is.null(fwd_yrs_rec_start)) {
+                    rec.years <- fit_i$data$years ### use all years, if not defined
+                  } else {
+                    rec.years <- seq(from = fwd_yrs_rec_start, max(fit_i$data$years))
+                  }
+                  
+                  ### years where selectivity is not used for mean in forecast
+                  overwriteSelYears <- max(fit_i$data$years) + fwd_yrs_sel
+                  
+                  ### forecast 
+                  fc_i <- stockassessment::forecast(fit = fit_i, 
+                                                    fscale = fscale, 
+                                                    fval = fval, 
+                                                    catchval = catchval,
+                                                    ave.years = ave.years,
+                                                    rec.years = rec.years,
+                                                    overwriteSelYears = overwriteSelYears,
+                                                    splitLD = fwd_splitLD)
+                  
+                  ### return forecast table
+                  return(attr(fc_i, "tab"))
+                  
+                }
   ### if forecast fails, error message returned
   ### replace error message with NA
   ### extract catch target
@@ -735,46 +787,50 @@ is_WKNSMSE <- function(stk, tracking, ctrl,
           fc_new <- foreach(fit_i = fit[pos_constr], 
                             iter_i = seq_along(fit)[pos_constr],
                             .errorhandling = "pass") %do% {
-                          
-            ### overwrite landing fraction with last year, if requested
-            if (!is.null(fwd_yrs_lf_remove)) {
-              ### index for years to remove/overwrite
-              idx_remove <- nrow(fit_i$data$landFrac) + fwd_yrs_lf_remove
-              ### overwrite
-              fit_i$data$landFrac[idx_remove, ] <- fit_i$data$landFrac[rep(nrow(fit_i$data$landFrac), length(idx_remove)), ]
-            }
-            
-            ### create vector with targets
-            ### target Fsq in intermediate year, and year after TAC year
-            fscale <- c(1, NA, 1)
-            ### target TAC in TAC year
-            cval <- c(NA, catch_target[iter_i], NA)
-            
-            ### years for average values
-            ave.years <- max(fit_i$data$years) + fwd_yrs_average
-            ### years for sampling of recruitment years
-            if (is.null(fwd_yrs_rec_start)) {
-              rec.years <- fit_i$data$years ### use all years, if not defined
-            } else {
-              rec.years <- seq(from = fwd_yrs_rec_start, max(fit_i$data$years))
-            }
-            
-            ### years where selectivity is not used for mean in forecast
-            overwriteSelYears <- max(fit_i$data$years) + fwd_yrs_sel
-            
-            ### forecast 
-            fc_i <- stockassessment::forecast(fit = fit_i, 
-                                              fscale = fscale, 
-                                              catchval = cval,
-                                              ave.years = ave.years,
-                                              rec.years = rec.years,
-                                          overwriteSelYears = overwriteSelYears,
-                                              splitLD = fwd_splitLD)
-            
-            ### return forecast table
-            return(attr(fc_i, "tab"))
-            
-          }
+                              
+                              ### overwrite landing fraction with last year, if requested
+                              if (!is.null(fwd_yrs_lf_remove)) {
+                                ### index for years to remove/overwrite
+                                idx_remove <- nrow(fit_i$data$landFrac) + fwd_yrs_lf_remove
+                                ### overwrite
+                                fit_i$data$landFrac[idx_remove, ] <- fit_i$data$landFrac[rep(nrow(fit_i$data$landFrac), length(idx_remove)), ]
+                              }
+                              
+                              ### check how to do forecast
+                              ### target recently advised TAC
+                              catchval <- ifelse(fwd_trgt == "TAC", c(TAC_last[,,,,, iter_i]), NA)
+                              ### scaled F
+                              fscale <- ifelse(fwd_trgt == "fsq", 1, NA)
+                              ### target new TAC after implementation of TAC constraint TAC year
+                              catchval[which(fwd_trgt == "hcr")[1]] <- catch_target[iter_i]
+                              ### target fsq (F that corresponds to TAC) in following years
+                              fscale[which(fwd_trgt == "hcr")[-1]] <- 1
+                              
+                              ### years for average values
+                              ave.years <- max(fit_i$data$years) + fwd_yrs_average
+                              ### years for sampling of recruitment years
+                              if (is.null(fwd_yrs_rec_start)) {
+                                rec.years <- fit_i$data$years ### use all years, if not defined
+                              } else {
+                                rec.years <- seq(from = fwd_yrs_rec_start, max(fit_i$data$years))
+                              }
+                              
+                              ### years where selectivity is not used for mean in forecast
+                              overwriteSelYears <- max(fit_i$data$years) + fwd_yrs_sel
+                              
+                              ### forecast 
+                              fc_i <- stockassessment::forecast(fit = fit_i, 
+                                                                fscale = fscale, 
+                                                                catchval = catchval,
+                                                                ave.years = ave.years,
+                                                                rec.years = rec.years,
+                                                                overwriteSelYears = overwriteSelYears,
+                                                                splitLD = fwd_splitLD)
+                              
+                              ### return forecast table
+                              return(attr(fc_i, "tab"))
+                              
+                            }
           
           ### overwrite updated forecasts
           fc[pos_constr] <- fc_new
@@ -829,7 +885,7 @@ is_WKNSMSE <- function(stk, tracking, ctrl,
     ### correct target catch later in iem module
     # catch_target <- catch_target - c(BB_return) +
     #   c(BB_bank_use) - c(BB_bank) + c(BB_borrow)
-  
+    
   } else {
     ### if B&B not applied, store 0 
     BB_return <- BB_bank_use <- BB_bank <- BB_borrow <- 0
@@ -859,7 +915,7 @@ is_WKNSMSE <- function(stk, tracking, ctrl,
 iem_WKNSMSE <- function(tracking, ctrl,
                         genArgs, ### contains ay (assessment year)
                         BB = FALSE, ### apply banking and borrowing
-                       ...) {
+                        ...) {
   
   if (isTRUE(BB)) {
     
@@ -906,8 +962,17 @@ fwd_WKNSMSE <- function(stk, ctrl,
                         sr.residuals, ### recruitment residuals
                         sr.residuals.mult = TRUE, ### are res multiplicative?
                         maxF = 2, ### maximum allowed Fbar
-                        proc_res = NULL, ### process error noise
+                        proc_res = NULL, ### process error noise,
+                        dd_M = NULL, relation = NULL, ### density-dependent M
                         ...) {
+  
+  ### calculate density-dependent natural mortality if required
+  if (!is.null(dd_M)) {
+    
+    ### overwrite m in the target year before projecting forward
+    m(stk)[, ac(ctrl@target[, "year"])] <- calculate_ddM(stk, ctrl@target[, "year"], relation = relation)
+    
+  }
   
   ### project forward with FLash::fwd
   stk[] <- fwd(object = stk, control = ctrl, sr = sr, 
@@ -926,9 +991,9 @@ fwd_WKNSMSE <- function(stk, ctrl,
     if (!isTRUE(proc_res == "fitted")) {
       
       stop("survival process error inacessible")
-    
+      
     } else {
-    
+      
       ### implement process error
       stock.n(stk)[, ac(yrs_new)] <- stock.n(stk)[, ac(yrs_new)] *
         fitted(sr)[, ac(yrs_new)]
@@ -956,7 +1021,7 @@ fwd_WKNSMSE <- function(stk, ctrl,
 SAM_uncertainty <- function(fit, n = 1000, print_screen = FALSE,
                             idx_cov = FALSE, ### get idx covariance
                             catch_est = FALSE ### get SAM catch estimate
-                            ) {
+) {
   
   if (!is(fit, "sam")) stop("fit has to be class \"sam\"")
   
@@ -1116,7 +1181,7 @@ SAM_uncertainty <- function(fit, n = 1000, print_screen = FALSE,
       return(cov[idx_surveys])
       
     })
-  
+    
   } else {
     
     idx_cov <- NULL
@@ -1158,7 +1223,7 @@ SAM_uncertainty <- function(fit, n = 1000, print_screen = FALSE,
     
     
     . <- capture.output(res_n <- foreach(iter_i = 1:n, .combine = c
-                                         ) %do% {
+    ) %do% {
       
       fit$obj$fn(sim.states[iter_i, 1:length(sds$par.fixed)])
       tmp <- cbind(fit$data$aux, est = fit$obj$report()$predObs)
@@ -1166,28 +1231,53 @@ SAM_uncertainty <- function(fit, n = 1000, print_screen = FALSE,
       tmp <- stats::aggregate(est ~ age + year, tmp,
                               FUN = sum)
       tmp_full <- expand.grid(age = unique(tmp$age),
-                         year = unique(tmp$year))
+                              year = unique(tmp$year))
       tmp <- merge(x = tmp, y = tmp_full, all = TRUE)
       tmp <- tmp[order(tmp$year, tmp$age), ]
       return(tmp$est)
       
     })
     catch_n <- FLQuant(NA, 
-      dimnames = list(year = rownames(fit$data$catchMeanWeight), 
-                      age = colnames(fit$data$catchMeanWeight), 
-                      iter = seq(n)))
+                       dimnames = list(year = rownames(fit$data$catchMeanWeight), 
+                                       age = colnames(fit$data$catchMeanWeight), 
+                                       iter = seq(n)))
     catch_n[] <- exp(res_n)
-  
+    
+    ### apply catch multiplier, if used
+    if (fit$conf$noScaledYears > 0) {
+      
+      ### get catch multiplier dimensions
+      ages_mult <- fit$conf$minAge:fit$conf$maxAge
+      yrs_mult <- fit$conf$keyScaledYears
+      ### get multiplier positions in created data set
+      pos_mult <- which(colnames(dat) == "logScale")
+      ### create catch multiplier FLQuant
+      catch_mult_data <- FLQuant(NA, 
+                                 dimnames = list(year = fit$conf$keyScaledYears,
+                                                 age = fit$conf$minAge:fit$conf$maxAge,
+                                                 iter = seq(nrow(dat))))
+      catch_mult_data[] <- rep(t(dat[, pos_mult]), each = length(ages_mult))
+      ### model values in log scale, exponentiate
+      catch_mult_data <- exp(catch_mult_data)
+      ### for simpler calculations, use catch_n as template
+      catch_mult <- catch_n %=% 1
+      catch_mult[ac(ages_mult), ac(yrs_mult)] <- catch_mult_data
+      
+      ### correct catch.n
+      catch_n <- catch_n * catch_mult
+      
+    }
+    
   } else {
     
     catch_n <- NULL
-  
+    
   }
   
   return(list(stock.n = stock.n, harvest = harvest,
               survey_catchability = catchability, catch_sd = catch_sd,
               survey_sd = survey_sd, survey_cov = survey_cov, 
-              proc_error = SdLogN, cach_n = catch_n))
+              proc_error = SdLogN, catch_n = catch_n))
   
 }
 
@@ -1224,7 +1314,7 @@ sam_getpar <- function(fit) {
   } else {
     return(pars)
   }
-
+  
 }
 
 
@@ -1286,7 +1376,7 @@ fmle_parallel <- function(sr, cl, seed = NULL) {
                        dimnames = list(dimnames(fits[[1]]@hessian)[[1]], 
                                        dimnames(fits[[1]]@hessian)[[2]], 
                                        iter = ac(dimnames(sr)$iter)))
-
+  
   details(sr) <- details(fits[[1]])
   
   return(sr)
@@ -1318,54 +1408,96 @@ setGeneric("iav", function(object, period, from, to, summary_per_iter,
 ### object = FLQuant
 #' @rdname iav
 setMethod(f = "iav",
-  signature = signature(object = "FLQuant"),
-  definition = function(object, 
-                        period, ### periodicity, e.g. use every 2nd value 
-                        from, to,### year range
-                        summary_per_iter, ### summarise values per iteration
-                        summary_year,
-                        summary_all) {
-  
-  ### subset years
-  if (!missing(from)) object <- window(object, start = from)
-  if (!missing(to)) object <- window(object, end = from)
-  
-  ### get years in object
-  yrs <- dimnames(object)$year
-  
-  ### select every n-th value, if requested
-  if (!missing(period)) {
-    yrs <- yrs[seq(from = 1, to = length(yrs), by = period)]
-  }
-  
-  ### reference years
-  yrs_ref <- yrs[-length(yrs)]
-  ### years to compare
-  yrs_comp <- yrs[-1]
-  
-  ### calculate variation (absolute values, ignore pos/neg)
-  res <- abs(1 - object[, yrs_comp] / object[, yrs_ref])
-  
-  ### replace Inf with NA (compared to 0 catch)
-  res <- ifelse(is.finite(res), res, NA)
-  
-  ### summarise per iteration
-  if (!missing(summary_per_iter)) {
-    res <- apply(res, 6, summary_per_iter, na.rm = TRUE)
-  }
-  
-  ### summarise per year
-  if (!missing(summary_year)) {
-    res <- apply(res, 1:5, summary_year, na.rm = TRUE)
-  }
-  
-  ### summarise over everything
-  if (!missing(summary_all)) {
-    
-    res <- summary_all(res, na.rm = TRUE)
-    
-  }
-  
-  return(res)
+          signature = signature(object = "FLQuant"),
+          definition = function(object, 
+                                period, ### periodicity, e.g. use every 2nd value 
+                                from, to,### year range
+                                summary_per_iter, ### summarise values per iteration
+                                summary_year,
+                                summary_all) {
+            
+            ### subset years
+            if (!missing(from)) object <- window(object, start = from)
+            if (!missing(to)) object <- window(object, end = from)
+            
+            ### get years in object
+            yrs <- dimnames(object)$year
+            
+            ### select every n-th value, if requested
+            if (!missing(period)) {
+              yrs <- yrs[seq(from = 1, to = length(yrs), by = period)]
+            }
+            
+            ### reference years
+            yrs_ref <- yrs[-length(yrs)]
+            ### years to compare
+            yrs_comp <- yrs[-1]
+            
+            ### calculate variation (absolute values, ignore pos/neg)
+            res <- abs(1 - object[, yrs_comp] / object[, yrs_ref])
+            
+            ### replace Inf with NA (compared to 0 catch)
+            res <- ifelse(is.finite(res), res, NA)
+            
+            ### summarise per iteration
+            if (!missing(summary_per_iter)) {
+              res <- apply(res, 6, summary_per_iter, na.rm = TRUE)
+            }
+            
+            ### summarise per year
+            if (!missing(summary_year)) {
+              res <- apply(res, 1:5, summary_year, na.rm = TRUE)
+            }
+            
+            ### summarise over everything
+            if (!missing(summary_all)) {
+              
+              res <- summary_all(res, na.rm = TRUE)
+              
+            }
+            
+            return(res)
+            
+          })
 
-})
+### ------------------------------------------------------------------------ ###
+### density-dependent natural mortality ####
+### ------------------------------------------------------------------------ ###
+### calculate density-dependent M from M2 relationships and stock.n 
+
+calculate_ddM <- function(stk,
+                          yr,
+                          relation) {
+  
+  ### read in M2 relationships
+  M2 <- relation
+  M2$pM2 <- M2$Nprey <- NA
+  M2 <- array(rep(unlist(M2), dim(stk)[6]), dim=c(nrow(M2), ncol(M2), dim(stk)[6]))
+  dimnames(M2)[[2]] <- c("age","predator","intercept","logbPred","logbPrey","nPred","nPrey","pM2") 
+  
+  M_new <- m(stk)[, ac(yr)] %=% 0
+  
+  for (iter_i in seq(dim(stk)[6])) {
+    
+    ### extract number of predator and prey cod-at-age from stock.n in the specified year (000s)
+    M2[,"nPrey", iter_i] <- stock.n(stk)[M2[,"age",iter_i], ac(yr),,,,iter_i]
+    M2[is.na(M2[,"nPred", iter_i]) ,"nPred", iter_i] <- stock.n(stk)[M2[!is.na(M2[,"predator",iter_i]), "predator", iter_i], ac(yr),,,,iter_i]
+    
+    ### calculate partial M2s from predator and prey abundances
+    M2[, "pM2", iter_i] <- M2[, "intercept", iter_i] + M2[, "logbPrey", iter_i] * log(M2[, "nPrey", iter_i])
+    M2[!is.na(M2[, "logbPred", iter_i]), "pM2", iter_i] <- M2[!is.na(M2[, "logbPred", iter_i]), "pM2", iter_i] + M2[!is.na(M2[, "logbPred", iter_i]), "logbPred", iter_i] * log(M2[!is.na(M2[, "logbPred", iter_i]), "nPred", iter_i])
+    M2[, "pM2", iter_i] <- exp(M2[, "pM2", iter_i])
+    
+    ### sum M2s for each prey age class
+    M2age <- aggregate(M2[,"pM2", iter_i], by = list(age = M2[,"age",iter_i]), sum)
+    
+    ### overwrite m in the specified year
+    M_new[M2age$age,,,,,iter_i] <- M2age$x
+    
+  }
+  ### and add 0.2 for non-predation mortality
+  M_new <- M_new + 0.2
+  
+  return(M_new)
+  
+}
