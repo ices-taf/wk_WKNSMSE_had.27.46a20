@@ -312,6 +312,7 @@ SAM_wrapper <- function(stk, idx, tracking,
     ### template for forecast targets
     fscale <- ifelse(fwd_trgt == "fsq", 1, NA)
     catchval <- ifelse(fwd_trgt == "TAC", -1, NA)
+    catchval <- ifelse(fwd_trgt == "intyrTACcont", -2, NA)
     ### recycle target if neccessary
     if (fwd_yrs > length(fwd_trgt)) {
       fscale <- c(fscale, tail(fscale, 1))
@@ -339,6 +340,26 @@ SAM_wrapper <- function(stk, idx, tracking,
                     }
                     
                     ### define forecast targets for current iteration
+                    if (catchval == -2){
+                      # use fsq unless it exceeds TAC
+                      fscale<-1
+                      catchval<-NA
+                      # fsq
+                      fc_fsq <-stockassessment::forecast(fit = fit_i, 
+                                                         fscale = 1, 
+                                                         catchval = NA,
+                                                         ave.years = ave.years,
+                                                         rec.years = rec.years,
+                                                         overwriteSelYears = overwriteSelYears,
+                                                         splitLD = fwd_splitLD)
+                      
+                      if(attr(fc_fsq, "tab")[,"catch:median"]>TAC_last[,,,,, iter_i]){
+                        # use intermediate year TAC constraint
+                        catchval<--1
+                        fscale<-NA
+                      }
+                    }
+                    
                     fscale_i <- fscale
                     ### load TAC as catch target
                     catchval_i <- ifelse(catchval == -1, c(TAC_last[,,,,, iter_i]), catchval)
