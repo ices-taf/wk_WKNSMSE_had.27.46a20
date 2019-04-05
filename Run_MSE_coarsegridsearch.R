@@ -48,11 +48,11 @@ library(tidyr)
 library(dplyr)
 
 ### load additional functions
-setwd(paste("/home/coleh/WKNSMSE/wk_WKNSMSE_had.27.46a20", sep=""))
+#setwd(paste("/home/coleh/WKNSMSE/wk_WKNSMSE_had.27.46a20", sep=""))
 source("a4a_mse_WKNSMSE_funs.R")
 invisible(lapply(list.files(path = "functions/", pattern = "*.R$", 
                             full.names = TRUE), source))
-path_out <- paste0("output/had4/runs/", iters, "_", years)
+
 ### ------------------------------------------------------------------------ ###
 ### setup parallel environment ####
 ### ------------------------------------------------------------------------ ###
@@ -64,22 +64,22 @@ path_out <- paste0("output/had4/runs/", iters, "_", years)
   ### ------------------------------------------------------------------------ ###
 
     if (HCRoption %in% 1:6) {
-    #options 1:12
+    #options 1:21
   hcr_vals <- expand.grid(
     Ftrgt = seq(from = 0.1, to = 0.3, by = 0.1),
-    Btrigger = seq(from = 120000, to = 150000, by = 10000))
+    Btrigger = seq(from = 120000, to = 180000, by = 10000))
   
-  # option 13:24
-  hcr_vals<-rbind(hcr_vals,
-  expand.grid(Ftrgt = seq(from = 0.28, to = 0.30, by = 0.01),
-    Btrigger = rep(180000,3)),
-     expand.grid(Ftrgt = seq(from = 0.27, to = 0.29, by = 0.01),
-    Btrigger = rep(170000,3)),
-         expand.grid(Ftrgt = seq(from = 0.26, to = 0.28, by = 0.01),
-    Btrigger = rep(160000,3)),
-         expand.grid(Ftrgt = seq(from = 0.25, to = 0.27, by = 0.01),
-    Btrigger = rep(150000,3))
-    )
+  # option 
+  # hcr_vals<-rbind(hcr_vals,
+  # expand.grid(Ftrgt = seq(from = 0.28, to = 0.30, by = 0.01),
+  #   Btrigger = rep(180000,3)),
+  #    expand.grid(Ftrgt = seq(from = 0.27, to = 0.29, by = 0.01),
+  #   Btrigger = rep(170000,3)),
+  #        expand.grid(Ftrgt = seq(from = 0.26, to = 0.28, by = 0.01),
+  #   Btrigger = rep(160000,3)),
+  #        expand.grid(Ftrgt = seq(from = 0.25, to = 0.27, by = 0.01),
+  #   Btrigger = rep(150000,3))
+  #   )
 }
 
   if (par_env == 1) {

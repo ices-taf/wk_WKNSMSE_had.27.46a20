@@ -281,7 +281,7 @@ SAM_wrapper <- function(stk, idx, tracking,
     
     ### check how to do forecast
     ### currently, can only do F status quo
-    if (!all(fwd_trgt %in% c("fsq","TAC"))) {
+    if (!all(fwd_trgt %in% c("fsq","TAC","intyrTACcont"))) {
       stop("only fsq and TAC supported in forecast")
     }
     
