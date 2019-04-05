@@ -1,0 +1,7 @@
+*.Rdata
+*.RData
+*.rds
+*.png
+*.txt
+*.dll
+*.DLL
