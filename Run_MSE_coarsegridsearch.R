@@ -109,7 +109,7 @@ invisible(lapply(list.files(path = "functions/", pattern = "*.R$",
     library(stockassessment)
     library(foreach)
     library(doRNG)
-    setwd(paste("/home/coleh/WKNSMSE/wk_WKNSMSE_had.27.46a20", sep=""))
+   # setwd(paste("/home/coleh/WKNSMSE/wk_WKNSMSE_had.27.46a20", sep=""))
     
     source("a4a_mse_WKNSMSE_funs.R")
     invisible(lapply(list.files(path = "functions/", pattern = "*.R$", 
@@ -128,11 +128,11 @@ invisible(lapply(list.files(path = "functions/", pattern = "*.R$",
   path_data <- paste0("input/had4/")
   
   omName<-"Baseline"
-  MPrunName<-"Base"
+  MPrunName<-"base"
   n<-iters
   
   ### load input objects
-  input<-readRDS(file = paste0(path_data,"/MP_base/MP",MPrunName,"_OM",omName,"_",n,".rds"))
+  input<-readRDS(file = paste0(path_data,"/",n,"_",years,"/MP",MPrunName,"_OM",omName,"_",n,".rds"))
   
   ### modify input for running in parallel
   input$genArgs$nblocks <- nblocks
@@ -162,7 +162,7 @@ invisible(lapply(list.files(path = "functions/", pattern = "*.R$",
   }
   
 input_bckp <- input
-for (HCR_comb in 13:24) {
+for (HCR_comb in nrow(hcr_vals)) {
   input <- input_bckp
   
   ### implement
@@ -292,7 +292,7 @@ for (HCR_comb in 13:24) {
   print(Sys.time())
   
   ### save results
-   path_out <- paste0("output/had4/runs/",omName,"/", n, "_", years)
+  path_out <- paste0("output/runs/had4/", n, "_", years,"/",omName)
  
   dir.create(path = path_out, recursive = TRUE)
   file_out <- paste0("HCR-", input$ctrl.mp$ctrl.hcr@args$option,

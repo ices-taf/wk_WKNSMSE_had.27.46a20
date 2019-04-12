@@ -250,6 +250,8 @@ is_WKNSMSE_JarworskiGrowth_intyrTACcont <- function(stk, tracking, ctrl,
                     if(attr(fc_fsq, "tab")[,"catch:median"]>TAC_last[,,,,, iter_i]){
                       # use intermediate year TAC constraint
                       catchval<-c(TAC_last[,,,,, iter_i], NA)
+                    }else{
+                      fscale<-c(1,NA)
                     }
                   }
              
