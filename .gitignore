@@ -1,3 +1,4 @@
+# ignore any file ending in:
 *.Rdata
 *.RData
 *.rds
@@ -6,3 +7,6 @@
 *.dll
 *.DLL
 *.pdf
+
+# but do track these files
+!MPbase_OMBaseline_1000.rds
