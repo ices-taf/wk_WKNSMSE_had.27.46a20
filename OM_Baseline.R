@@ -1125,18 +1125,18 @@ if(F){
   # comparison of 10 yr mean with actual values
   windows()
   param.list<-c("stock.wt","catch.wt","landings.wt","discards.wt","mat","m")
-  
+  col.list<-rainbow(length(eqSim_yrs))
   for (par.nm in param.list){
     
     dat<-eval(parse(text=paste0("stk_oem@",par.nm)))
     plot(ages,c(dat[,ac(2018),,,,1]),col="black",lwd=3,type="n",ylim=range(dat),ylab=gsub("[.]"," ",par.nm))
     # plot each eqSim year
-    for (i in eqSim_yrs){
-      lines(ages,c(dat[,ac(i),,,,1]),col="blue",lty=2)
+    for (i in 1:length(eqSim_yrs)){
+      lines(ages,c(dat[,ac(eqSim_yrs[i]),,,,1]),col=col.list[i],lty=2)
     }
     # plot OEM value
     lines(ages,c(dat[,ac(2018),,,,1]),col="black",lwd=2)
-    
+    legend("topleft",inset=0.02,legend=c(eqSim_yrs,"OEM"),col=c(col.list,"black"),lty=c(rep(2,length(eqSim_yrs)),1))
     savePlot(paste0("output/OM_plots/OM_",omName,"_",stkname,"_biological parameters - oem check - ",gsub("[.]"," ",par.nm),".png"), type="png",res=600)
   }
   
