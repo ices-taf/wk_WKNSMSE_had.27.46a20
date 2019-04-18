@@ -107,7 +107,7 @@ path_data <- paste0("input/had4/", iters, "_", years, "/")
 
 
 ### load input objects
-input<-readRDS(file = paste0("MPbase_OM",OM_alt,"_",iters,".rds"))
+input<-readRDS(file = paste0(path_data, "MPbase_OM",OM_alt,"_",iters,".rds"))
 
 ### modify input for running in parallel
 input$genArgs$nblocks <- nblocks
