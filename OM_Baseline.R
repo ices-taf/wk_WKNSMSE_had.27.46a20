@@ -847,7 +847,7 @@ ctrl_obj <- mpCtrl(list(
   ctrl.est = mseCtrl(method = SAM_wrapper,
                      args = c(### short term forecast specifications
                        forecast = TRUE, 
-                       fwd_trgt = "intyrTACcont", fwd_yrs = 1, 
+                       fwd_trgt = "fsq", fwd_yrs = 1, 
                        had4_stf_def,
                        ### speeding SAM up
                        newtonsteps = 0, rel.tol = 0.001,
@@ -863,7 +863,7 @@ ctrl_obj <- mpCtrl(list(
   ctrl.is = mseCtrl(method = is_WKNSMSE_JarworskiGrowth_intyrTACcont, 
                     args = c(hcrpars = list(refpts_mse),
                              ### for short term forecast
-                             fwd_trgt = list(c("intyrTACcont", "hcr")), fwd_yrs = 2,
+                             fwd_trgt = list(c("fsq", "hcr")), fwd_yrs = 2,
                              had4_stf_def#,
                              ### TAC constraint
                              #TAC_constraint = TRUE,

@@ -281,7 +281,7 @@ SAM_wrapper <- function(stk, idx, tracking,
     
     ### check how to do forecast
     ### currently, can only do F status quo
-    if (!all(fwd_trgt %in% c("fsq","TAC","intyrTACcont"))) {
+    if (!all(fwd_trgt %in% c("fsq","TAC"))) {
       stop("only fsq and TAC supported in forecast")
     }
     
@@ -312,9 +312,6 @@ SAM_wrapper <- function(stk, idx, tracking,
     ### template for forecast targets
     fscale <- ifelse(fwd_trgt == "fsq", 1, NA)
     catchval <- ifelse(fwd_trgt == "TAC", -1, NA)
-    # if(all(is.na(catchval))){
-    #    catchval <- ifelse(fwd_trgt == "intyrTACcont", -2, NA)
-    #  }
     ### recycle target if neccessary
     if (fwd_yrs > length(fwd_trgt)) {
       fscale <- c(fscale, tail(fscale, 1))
@@ -345,45 +342,6 @@ SAM_wrapper <- function(stk, idx, tracking,
                     fscale_i <- fscale
                     ### load TAC as catch target
                     catchval_i <- ifelse(catchval == -1, c(TAC_last[,,,,, iter_i]), catchval)
-                    
-                    if (fwd_trgt == "intyrTACcont"){
-                      # use fsq unless it exceeds TAC
-                      # fsq
-                      fc_fsq <-stockassessment::forecast(fit = fit_i, 
-                                                         fscale = 1, 
-                                                         catchval = NA,
-                                                         ave.years = ave.years,
-                                                         rec.years = rec.years,
-                                                         overwriteSelYears = overwriteSelYears,
-                                                         splitLD = fwd_splitLD)
-                      
-                      if(attr(fc_fsq, "tab")[,"catch:median"]>TAC_last[,,,,, iter_i]){
-                        # use intermediate year TAC constraint
-                        catchval_i<--1
-                        fscale_i<-NA
-                        if (fwd_yrs > length(fwd_trgt)) {
-                          fscale_i <- c(fscale_i, tail(fscale_i, 1))
-                          catchval_i <- c(catchval_i, tail(catchval_i, 1))
-                        }
-                        fscale_i <- fscale_i
-                        ### load TAC as catch target
-                        catchval_i <- ifelse(catchval_i == -1, c(TAC_last[,,,,, iter_i]), catchval_i)
-                      }else{ 
-                        #use Fsq
-                        catchval_i<-NA
-                        fscale_i<-1
-                        if (fwd_yrs > length(fwd_trgt)) {
-                          fscale_i <- c(fscale_i, tail(fscale_i, 1))
-                          catchval_i <- c(catchval_i, tail(catchval_i, 1))
-                        }
-                        fscale_i <- fscale_i
-                        ### load TAC as catch target
-                        catchval_i <- ifelse(catchval_i == -1, c(TAC_last[,,,,, iter_i]), catchval_i)
-                      }
-                    }else{
-                      warning("forecast assumption is not intyrTACcont in all forecast years")
-                      
-                    }
                     
                     ### run forecast
                     fc_i <- stockassessment::forecast(fit = fit_i, 
@@ -466,7 +424,6 @@ SAM_wrapper <- function(stk, idx, tracking,
   
 }
 
-### ------------------------------------------------------------------------ ###
 ### phcr: parameterize HCR ####
 ### ------------------------------------------------------------------------ ###
 phcr_WKNSMSE <- function(Btrigger = NULL, Ftrgt = NULL, Bpa = NULL, Fpa = NULL,
