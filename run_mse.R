@@ -151,18 +151,20 @@ if (HCRoption %in% 1:6) {
   ### MSY values: 817
   hcr_vals <- rbind(hcr_vals, data.frame(Ftrgt = 0.194, Btrigger = 132000))
   ### additional combinations after finding yield maximum
-  ### max Ftrgt * 1.1 & 0.9, Fmsylower/upper
-  ### 817-822
+  ### max Ftrgt * 0.9/1.1,1.5,2, Fmsylower (Fmsyupper equals Fmsy)
+  ### 818-823
   comb_max <- switch(HCRoption,
                      "1" = c(180000, 0.28),
-                     "2" = c(NA, NA),
+                     "2" = c(190000, 0.29),
                      "3" = c(180000, 0.28),
-                     "4" = c(NA, NA),
-                     "5" = c(NA, NA),
-                     "6" = c(NA, NA))
+                     "4" = c(180000, 0.28),
+                     "5" = c(170000, 0.27),
+                     "6" = c(160000, 0.26))
   hcr_vals <- rbind(hcr_vals,
-                    expand.grid(Ftrgt = c(comb_max[2], comb_max[2]*0.9,
-                                          comb_max[2]*1.1, 0.167, 0.194),
+                    expand.grid(Ftrgt = c(comb_max[2], 
+                                          0.167, comb_max[2]*0.9,
+                                          comb_max[2]*1.1, comb_max[2]*1.5,
+                                          comb_max[2]*2),
                                 Btrigger = comb_max[1]))
 
 }
