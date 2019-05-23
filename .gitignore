@@ -7,7 +7,8 @@
 *.dll
 *.DLL
 *.pdf
+*.db
 
 # but do track these files
-!MPbase_OMBaseline_1000.rds
-!MPbase_OMAlt2_1000.rds
+#!MPbase_OMBaseline_1000.rds
+#!MPbase_OMAlt2_1000.rds

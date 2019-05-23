@@ -18,9 +18,14 @@ source("a4a_mse_WKNSMSE_funs.R")
 ### get files ####
 ### ------------------------------------------------------------------------ ###
 
-path_res <- "output/runs/had4/1000_20/Baseline/"
+path_res <- "output/runs/had4/1000_20/"
 path_res_stats<-"output/runs/had4/"
-path_plot<-"output/runs/had4/1000_20/Baseline/plots/"
+path_plot<-"output/runs/had4/1000_20/plots/"
+
+# add Alt1
+#path_res <- "output/runs/had4/999_20/Alt1/"
+#path_res_stats<-"output/runs/had4/"
+
 files_res <- data.frame(file = list.files(path_res, pattern = "*.rds"), 
                         stringsAsFactors = FALSE)
 files_res <- files_res[!grepl(x = files_res$file, pattern = "*stats*"),, 
@@ -84,6 +89,33 @@ res_list <- foreach(i = seq(nrow(stats_new)), .packages = "mse") %dopar% {
 ### risk 3: maximum of annual proportions
 ### catch: mean catch in period (mean over years and iterations)
 ### iav: inter-annual variation of catch, average over years and iterations
+
+
+# first remove failed iters
+### SAM convergence
+stats_new$conv_failed <- foreach(x = res_list, .packages = "FLCore",
+                                 .combine = "c") %dopar% {
+                                   sum(x@tracking["conv.est", ac(2018:2037)] != 0)
+                                 }
+all(stats_new$conv_failed == 0)
+
+pos <- which(stats_new$conv_failed != 0)
+
+#remove iterations that failed to converge
+if(length(pos)>0){
+  for (i in 1:length(pos)){
+    
+    #fl<- #readRDS(paste0(path_res, as.character(tmp$file[i])))
+    pos_iter<-NULL
+    for (k in 1:dim(res_list[[pos[i]]]@tracking)[6]){
+      if(sum(res_list[[pos[i]]]@tracking["conv.est",,,,,k],na.rm=T)>0){
+        pos_iter<-c(pos_iter,k)
+      }
+    }
+    stk2<-iter(res_list[[pos[i]]]@stock,c(1:999)[-pos_iter])
+    res_list[[pos[i]]]@stock<-stk2
+  }
+}
 
 
 ### catch
@@ -229,32 +261,13 @@ stats_new$recovery_time <- foreach(x = res_list, .packages = "FLCore",
                                                     }
                                                   }))
                                    }
-### SAM convergence
-stats_new$conv_failed <- foreach(x = res_list, .packages = "FLCore",
-                                 .combine = "c") %dopar% {
-                                   sum(x@tracking["conv.est", ac(2018:2037)] != 0)
-                                 }
-all(stats_new$conv_failed == 0)
+
 ### check F maxed (2)
 stats_new$F_maxed <- foreach(x = res_list, .packages = "FLCore",
                              .combine = "c") %dopar% {
                                sum(window(fbar(stock(x)), start = 2019) >= 2)
                              }
- pos <- which(stats_new$F_maxed != 0)
-if(length(pos)>0){
-  
- stats_new[pos, ]
- 
- for (i in 1:length(pos)){
- plot(stock(res_list[[pos[i]]]))
-savePlot(paste0(path_plot,"Fmax_",gsub(".rds","",stats_new$file[pos[i]]),".png"),type="png")
- pos_iter <- which(apply(fbar(stock(res_list[[pos[i]]])), c(1, 6), max) >= 2)
- for (j in 1:length(pos_iter)){
-   plot(stock(res_list[[pos[i]]])[,,,,, pos_iter[j]])
- savePlot(paste0(path_plot,"Fmax_iter_",pos_iter[j],"_",gsub(".rds","",stats_new$file[pos[i]]),".png"),type="png")
- }
- }
-}
+
 ### F maxed in 12 scenarios, 
 ### always only once in one iteration
 
@@ -283,6 +296,27 @@ stats <- stats[order(stats$file), ]
 saveRDS(object = stats, file = paste0(path_res_stats, "stats.rds"))
 write.csv(x = stats, file = paste0(path_res_stats,"stats.csv"), row.names = FALSE)
 
+
+#plot Fmax
+pos <- which(stats$F_maxed != 0)
+if(length(pos)>0){
+  
+  stats[pos, ]
+  
+  for (i in (1:length(pos))[-2]){
+    res_i <- readRDS(paste0(path_res, stats$file[pos[i]]))
+    
+    plot(stock(res_i))
+    ggsave(filename = paste0(path_plot,"/Fmax/","Fmax_",gsub(".rds","",stats$file[pos[i]]),".png"), 
+           width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
+    pos_iter <- which(apply(fbar(stock(res_i)), c(1, 6), max) >= 2)
+    for (j in 1:length(pos_iter)){
+      plot(stock(res_i)[,,,,, pos_iter[j]])
+      ggsave(filename = paste0(path_plot,"/Fmax/","Fmax_iter_",pos_iter[j],"_",gsub(".rds","",stats$file[pos[i]]),".png"), 
+             width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
+        }
+  }
+}
 ### ------------------------------------------------------------------------ ###
 ### plot ####
 ### ------------------------------------------------------------------------ ###
@@ -432,19 +466,19 @@ grid(dat = stats %>%
        filter(HCR == "A" & BB == FALSE & TACconstr == FALSE &
                 Ftrgt %in% c(0.194,round(seq(0, 1, 0.01), 2)) & OM == "Baseline"), 
      HCR = "A", time = "long", add_risk1 = FALSE, highlight_max = TRUE)
-ggsave(filename = "output/runs/had4/1000_20/Baseline/plots/grid/grid_A_long.png", 
+ggsave(filename = "output/runs/had4/1000_20/plots/grid/grid_A_long.png", 
        width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
 grid(dat = stats %>%
        filter(HCR == "A" & BB == FALSE & TACconstr == FALSE &
                 Ftrgt %in% c(0.194,round(seq(0, 1, 0.01), 2)) & OM == "Baseline"), 
      HCR = "A", time = "medium")
-ggsave(filename = "output/runs/had4/1000_20/Baseline/plots/grid/grid_A_medium.png", 
+ggsave(filename = "output/runs/had4/1000_20/plots/grid/grid_A_medium.png", 
        width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
 grid(dat = stats %>%
        filter(HCR == "A" & BB == FALSE & TACconstr == FALSE &
                 Ftrgt %in% c(0.194,round(seq(0, 1, 0.01), 2)) & OM == "Baseline"), 
      HCR = "A", time = "short")
-ggsave(filename = "output/runs/had4/1000_20/Baseline/plots/grid/grid_A_short.png", 
+ggsave(filename = "output/runs/had4/1000_20/plots/grid/grid_A_short.png", 
        width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
 
 ### B
@@ -452,19 +486,19 @@ grid(dat = stats %>%
        filter(HCR == "B" & BB == FALSE & TACconstr == FALSE &
                 Ftrgt %in% c(0.194,round(seq(0, 1, 0.01), 2)) & OM == "Baseline"), 
      HCR = "B", time = "long", add_risk1 = FALSE, highlight_max = TRUE)
-ggsave(filename = "output/runs/had4/1000_20/Baseline/plots/grid/grid_B_long.png", 
+ggsave(filename = "output/runs/had4/1000_20/plots/grid/grid_B_long.png", 
        width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
 grid(dat = stats %>%
        filter(HCR == "B" & BB == FALSE & TACconstr == FALSE &
                 Ftrgt %in% c(0.194,round(seq(0, 1, 0.01), 2)) & OM == "Baseline"), 
      HCR = "B", time = "medium")
-ggsave(filename = "output/runs/had4/1000_20/Baseline/plots/grid/grid_B_medium.png", 
+ggsave(filename = "output/runs/had4/1000_20/plots/grid/grid_B_medium.png", 
        width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
 grid(dat = stats %>%
        filter(HCR == "B" & BB == FALSE & TACconstr == FALSE &
                 Ftrgt %in% c(0.194,round(seq(0, 1, 0.01), 2)) & OM == "Baseline"), 
      HCR = "B", time = "short")
-ggsave(filename = "output/runs/had4/1000_20/Baseline/plots/grid/grid_B_short.png", 
+ggsave(filename = "output/runs/had4/1000_20/plots/grid/grid_B_short.png", 
        width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
 
 ### C
@@ -478,13 +512,13 @@ grid(dat = stats %>%
        filter(HCR == "C" & BB == FALSE & TACconstr == FALSE &
                 Ftrgt %in% c(0.194,round(seq(0, 1, 0.01), 2)) & OM == "Baseline"), 
      HCR = "C", time = "medium")
-ggsave(filename = "output/runs/had4/1000_20/Baseline/plots/grid/grid_C_medium.png", 
+ggsave(filename = "output/runs/had4/1000_20/plots/grid/grid_C_medium.png", 
        width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
 grid(dat = stats %>%
        filter(HCR == "C" & BB == FALSE & TACconstr == FALSE &
                 Ftrgt %in% c(0.194,round(seq(0, 1, 0.01), 2)) & OM == "Baseline"), 
      HCR = "C", time = "short")
-ggsave(filename = "output/runs/had4/1000_20/Baseline/plots/grid/grid_C_short.png", 
+ggsave(filename = "output/runs/had4/1000_20/plots/grid/grid_C_short.png", 
        width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
 
 ### AD
@@ -492,19 +526,19 @@ grid(dat = stats %>%
        filter(HCR == "A" & BB == TRUE & TACconstr == TRUE &
                 Ftrgt %in% c(0.194,round(seq(0, 1, 0.01), 2)) & OM == "Baseline"), 
      HCR = "A", time = "long", add_risk1 = FALSE, highlight_max = TRUE)
-ggsave(filename = "output/runs/had4/1000_20/Baseline/plots/grid/grid_AD_long.png", 
+ggsave(filename = "output/runs/had4/1000_20/plots/grid/grid_AD_long.png", 
        width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
 grid(dat = stats %>%
        filter(HCR == "A" & BB == TRUE & TACconstr == TRUE &
                 Ftrgt %in% c(0.194,round(seq(0, 1, 0.01), 2)) & OM == "Baseline"), 
      HCR = "A", time = "medium")
-ggsave(filename = "output/runs/had4/1000_20/Baseline/plots/grid/grid_AD_medium.png", 
+ggsave(filename = "output/runs/had4/1000_20/plots/grid/grid_AD_medium.png", 
        width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
 grid(dat = stats %>%
        filter(HCR == "A" & BB == TRUE & TACconstr == TRUE &
                 Ftrgt %in% c(0.194,round(seq(0, 1, 0.01), 2)) & OM == "Baseline"), 
      HCR = "A", time = "short")
-ggsave(filename = "output/runs/had4/1000_20/Baseline/plots/grid/grid_AD_short.png", 
+ggsave(filename = "output/runs/had4/1000_20/plots/grid/grid_AD_short.png", 
        width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
 
 
@@ -513,19 +547,19 @@ grid(dat = stats %>%
        filter(HCR == "B" & BB == TRUE & TACconstr == TRUE &
                 Ftrgt %in% c(0.194,round(seq(0, 1, 0.01), 2)) & OM == "Baseline"), 
      HCR = "B", time = "long", add_risk1 = FALSE, highlight_max = TRUE)
-ggsave(filename = "output/runs/had4/1000_20/Baseline/plots/grid/grid_BE_long.png", 
+ggsave(filename = "output/runs/had4/1000_20/plots/grid/grid_BE_long.png", 
        width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
 grid(dat = stats %>%
        filter(HCR == "B" & BB == TRUE & TACconstr == TRUE &
                 Ftrgt %in% c(0.194,round(seq(0, 1, 0.01), 2)) & OM == "Baseline"), 
      HCR = "B", time = "medium")
-ggsave(filename = "output/runs/had4/1000_20/Baseline/plots/grid/grid_BE_medium.png", 
+ggsave(filename = "output/runs/had4/1000_20/plots/grid/grid_BE_medium.png", 
        width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
 grid(dat = stats %>%
        filter(HCR == "B" & BB == TRUE & TACconstr == TRUE &
                 Ftrgt %in% c(0.194,round(seq(0, 1, 0.01), 2)) & OM == "Baseline"), 
      HCR = "B", time = "short")
-ggsave(filename = "output/runs/had4/1000_20/Baseline/plots/grid/grid_BE_short.png", 
+ggsave(filename = "output/runs/had4/1000_20/plots/grid/grid_BE_short.png", 
        width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
 
 
@@ -534,19 +568,19 @@ grid(dat = stats %>%
        filter(HCR == "C" & BB == TRUE & TACconstr == TRUE &
                 Ftrgt %in% c(0.194,round(seq(0, 1, 0.01), 2)) & OM == "Baseline"), 
      HCR = "C", time = "long", add_risk1 = FALSE, highlight_max = TRUE)
-ggsave(filename = "output/runs/had4/1000_20/Baseline/plots/grid/grid_CE_long.png", 
+ggsave(filename = "output/runs/had4/1000_20/plots/grid/grid_CE_long.png", 
        width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
 grid(dat = stats %>%
        filter(HCR == "C" & BB == TRUE & TACconstr == TRUE &
                 Ftrgt %in% c(0.194,round(seq(0, 1, 0.01), 2)) & OM == "Baseline"), 
      HCR = "C", time = "medium")
-ggsave(filename = "output/runs/had4/1000_20/Baseline/plots/grid/grid_CE_medium.png", 
+ggsave(filename = "output/runs/had4/1000_20/plots/grid/grid_CE_medium.png", 
        width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
 grid(dat = stats %>%
        filter(HCR == "C" & BB == TRUE & TACconstr == TRUE &
                 Ftrgt %in% c(0.194,round(seq(0, 1, 0.01), 2)) & OM == "Baseline"), 
      HCR = "C", time = "short")
-ggsave(filename = "output/runs/had4/1000_20/Baseline/plots/grid/grid_CE_short.png", 
+ggsave(filename = "output/runs/had4/1000_20/plots/grid/grid_CE_short.png", 
        width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
 
 
@@ -554,12 +588,12 @@ ggsave(filename = "output/runs/had4/1000_20/Baseline/plots/grid/grid_CE_short.pn
 ### plot some runs ####
 ### ------------------------------------------------------------------------ ###
 ### function for plotting
-plot_stk <- function(stats, OM_ = "cod4", HCR_ = "A", Ftrgt_ = 0.31,
-                     Btrigger_ = 150000, TACconstr_ = FALSE, BB_ = FALSE,
+plot_stk <- function(stats, OM_ = "Baseline", HCR_ = "A", Ftrgt_ = 0.28,
+                     Btrigger_ = 180000, TACconstr_ = FALSE, BB_ = FALSE,
                      probs = c(0.05, 0.25, 0.5, 0.75, 0.95),
-                     path_out = "output/runs/cod4/1000_20/",
-                     path_in = "input/cod4/1000_20/", file_in = "base_run.rds",
-                     path_res = "output/runs/cod4/1000_20/plots/stock_plots/",
+                     path_out = "output/runs/had4/1000_20/",
+                     path_in = "input/had4/1000_20/", file_in = "MPbase_OMBaseline_1000.rds",
+                     path_res = "output/runs/had4/1000_20/plots/stock_plots/",
                      save_plot = TRUE,
                      get_history = TRUE, overwrite_catch_history = FALSE,
                      yr_start = 2018.5,
@@ -582,10 +616,23 @@ plot_stk <- function(stats, OM_ = "cod4", HCR_ = "A", Ftrgt_ = 0.31,
     stk_i[, dimnames(res_i@stock)$year] <- res_i@stock
     ### overwrite catch history
     if (isTRUE(overwrite_catch_history)) {
-      catch_hist <- readRDS(paste0(path_in, "catch_n.rds"))
+      catch_hist <- readRDS(paste0(path_in, OM_,"_catch_n.rds"))
       catch.n(stk_i)[, dimnames(catch_hist)$year] <- catch_hist
       catch(stk_i) <- computeCatch(stk_i)
     }
+  }
+  
+  nonConv<-c(sum(res_i@tracking["conv.est", ac(2018:2037)] != 0))
+  nIter<-dim(res_i@stock)[6]
+  if (nonConv>0){
+    pos_iter<-NULL 
+    for (k in 1:nIter){
+      if(sum(res_i@tracking["conv.est",,,,,k],na.rm=T)>0){
+        pos_iter<-c(pos_iter,k)
+      }
+    }
+    stk2<-iter(stk_i,c(1:nIter)[-pos_iter])
+    stk_i<-stk2
   }
   
   ### plot
@@ -651,102 +698,144 @@ plot_stk <- function(stats, OM_ = "cod4", HCR_ = "A", Ftrgt_ = 0.31,
 
 ### base OM
 ### current HCR
-plot_stk(stats = stats, OM_ = "cod4", HCR_ = "A", Ftrgt_ = 0.31, 
-         Btrigger_ = 150000, TACconstr_ = FALSE, BB_ = FALSE, 
-         overwrite_catch_history = TRUE, iters_plot = 1:5)
+plot_stk(stats = stats, OM_ = "Baseline", HCR_ = "A", Ftrgt_ = 0.194, 
+         Btrigger_ = 132000, TACconstr_ = TRUE, BB_ = TRUE, 
+         overwrite_catch_history = TRUE, iters_plot = 7:12)
 ### A, B, C, AD, BE, CE
-combs <- data.frame(name = c("F0", "A*", "A", "B", "C", "AD", "BE", "CE"),
-                    HCR = c("F0", "A", "A", "B", "C", "A", "B", "C"),
-                    BB = c(rep(FALSE, 5), TRUE, TRUE, TRUE),
-                    TACconstr = c(rep(FALSE, 5), TRUE, TRUE, TRUE),
-                    Btrigger = c(0, 150000, 170000, 160000, 170000, 190000,
-                                 130000, 140000),
-                    Ftrgt = c(0, 0.31, 0.38, 0.38, 0.38, 0.40, 0.36, 0.36))
-combs <- rbind(cbind(combs, OM = "cod4"),
-               cbind(combs, OM = "cod4_alt1"),
-               cbind(combs, OM = "cod4_alt2"),
-               cbind(combs, OM = "cod4_alt3"))
-combs <- combs[-c(10, 18, 26), ]
+combs <- data.frame(name = c( "A*", "A", "B", "C", "AD", "BE", "CE"),
+                    HCR = c( "A", "A", "B", "C", "A", "B", "C"),
+                    BB = c(rep(FALSE, 4), TRUE, TRUE, TRUE),
+                    TACconstr = c(rep(FALSE, 4), TRUE, TRUE, TRUE),
+                    Btrigger = c(132000, 180000, 190000, 180000, 180000,
+                                 170000, 160000),
+                    Ftrgt = c(0.194, 0.28, 0.29, 0.28, 0.28, 0.27, 0.26))
+combs$OM<-"Baseline"
+
 lapply(X = split(combs, seq(nrow(combs))), FUN = function(i) {
   plot_stk(stats = stats, OM_ = i$OM, HCR_ = i$HCR, Ftrgt_ = i$Ftrgt, 
            Btrigger_ = i$Btrigger, TACconstr_ = i$TACconstr, BB_ = i$BB, 
-           overwrite_catch_history = TRUE,
-           path_in = paste0("input/", i$OM, "/1000_20/"))
+           overwrite_catch_history = TRUE,file_in = paste0("MPbase_OM",i$OM,"_1000.rds"))
 })
 ### plot with first five iterations
 lapply(X = split(combs, seq(nrow(combs))), FUN = function(i) {
   plot_stk(stats = stats, OM_ = i$OM, HCR_ = i$HCR, Ftrgt_ = i$Ftrgt, 
            Btrigger_ = i$Btrigger, TACconstr_ = i$TACconstr, BB_ = i$BB, 
-           overwrite_catch_history = TRUE, iters_plot = 1:5,
-           path_in = paste0("input/", i$OM, "/1000_20/"))
+           overwrite_catch_history = TRUE, iters_plot = 7:12,file_in = paste0("MPbase_OM",i$OM,"_1000.rds"))
 })
 
 ### add plot for A*D
-plot_stk(stats = stats, OM_ = "cod4", HCR_ = "A", Ftrgt_ = 0.31, 
-         Btrigger_ = 150000, TACconstr_ = TRUE, BB_ = TRUE, 
-         overwrite_catch_history = TRUE,
-         path_in = paste0("input/cod4/1000_20/"))
-plot_stk(stats = stats, OM_ = "cod4", HCR_ = "A", Ftrgt_ = 0.31, 
-         Btrigger_ = 150000, TACconstr_ = TRUE, BB_ = TRUE, 
-         overwrite_catch_history = TRUE, iters_plot = 1:5,
-         path_in = paste0("input/cod4/1000_20/"))
+plot_stk(stats = stats, OM_ = "Baseline", HCR_ = "A", Ftrgt_ = 0.194, 
+         Btrigger_ = 132000, TACconstr_ = TRUE, BB_ = TRUE, 
+         overwrite_catch_history = TRUE)
+plot_stk(stats = stats, OM_ = "Baseline", HCR_ = "A", Ftrgt_ = 0.194, 
+         Btrigger_ = 132000, TACconstr_ = TRUE, BB_ = TRUE, 
+         overwrite_catch_history = TRUE, iters_plot = 7:12)
 
-### ------------------------------------------------------------------------ ###
-### F=0 plot ####
-### ------------------------------------------------------------------------ ###
+# Alt 1 OM
+### A, B, C, AD, BE, CE
+combs <- data.frame(name = c( "A*", "A", "B", "C", "AD", "BE", "CE"),
+                    HCR = c( "A", "A", "B", "C", "A", "B", "C"),
+                    BB = c(rep(FALSE, 4), TRUE, TRUE, TRUE),
+                    TACconstr = c(rep(FALSE, 4), TRUE, TRUE, TRUE),
+                    Btrigger = c(132000, 180000, 190000, 180000, 180000,
+                                 170000, 160000),
+                    Ftrgt = c(0.194, 0.28, 0.29, 0.28, 0.28, 0.27, 0.26))
+combs$OM<-"Alt1"
 
-stkF0 <- readRDS(file = "input/cod4/10000_100/data_F0.RData")$om@stock
-stkF0_res <- readRDS("output/runs/cod4/F0_10000_100.rds")@stock
+lapply(X = split(combs, seq(nrow(combs))), FUN = function(i) {
+  plot_stk(stats = stats, OM_ = i$OM, HCR_ = i$HCR, Ftrgt_ = i$Ftrgt, 
+           Btrigger_ = i$Btrigger, TACconstr_ = i$TACconstr, BB_ = i$BB, 
+           overwrite_catch_history = F,file_in = paste0("MPbase_OM",i$OM,"_999.rds"),
+           path_in = "input/had4/999_20/")
+})
+### plot with first five iterations
+lapply(X = split(combs, seq(nrow(combs))), FUN = function(i) {
+  plot_stk(stats = stats, OM_ = i$OM, HCR_ = i$HCR, Ftrgt_ = i$Ftrgt, 
+           Btrigger_ = i$Btrigger, TACconstr_ = i$TACconstr, BB_ = i$BB, 
+           overwrite_catch_history = F, iters_plot = 7:12,file_in = paste0("MPbase_OM",i$OM,"_999.rds"),
+           path_in = "input/had4/999_20/")
+})
 
-catch_n <- readRDS("input/cod4/10000_100/catch_n.rds")
-catch.n(stkF0)[dimnames(catch_n)$age, dimnames(catch_n)$year] <- 
-  catch_n
-catch(stkF0) <- computeCatch(stkF0)
 
-stkF0[, ac(2018:2118)] <- stkF0_res[, ac(2018:2118)]
-plot(stkF0, probs = c(0.05, 0.25, 0.5, 0.75, 0.95)) +
-  xlab("year") + geom_vline(xintercept = 2018.5) +
-  geom_hline(data = data.frame(qname = "SSB", data = 107000),
-             aes(yintercept = data), linetype = "dashed") +
-  geom_hline(data = data.frame(qname = "SSB", data = 150000),
-             aes(yintercept = data), linetype = "solid") +
-  geom_hline(data = data.frame(qname = "F", data = 0.54),
-             aes(yintercept = data), linetype = "dashed") +
-  geom_hline(data = data.frame(qname = "F", data = 0.31),
-             aes(yintercept = data), linetype = "solid") +
-  theme_bw() #+
-# geom_blank(data = as.data.frame(FLQuants(`Rec` = rec(stkF0),
-#                                          `SSB` = ssb(stkF0),
-#                                          `Catch` = catch(stkF0),
-#                                          `F` = fbar(stkF0))), 
-#            aes(x = year, y = data, group = iter))
-ggsave(filename = paste0("output/runs/cod4/1000_20/plots/stock_plots/", 
-                         "stk_F0_10000iters.png"),
-       width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
-### iterations
-stkF0_df <- as.data.frame(FLQuants(`Rec [1000]` = rec(stkF0),
-                                   `SSB [t]` = ssb(stkF0),
-                                   `Catch [t]` = catch(stkF0),
-                                   `F` = fbar(stkF0)))
-ggplot(data = stkF0_df[stkF0_df$iter %in% 1:1000, ], 
-       aes(x = year, y = data, group = iter)) +
-  geom_line(alpha = 0.025) +
-  facet_wrap(~ qname, ncol = 1, strip.position = "right",
-             scale = "free_y") +
-  theme_bw() +
-  ylim(c(0, NA)) + labs(y = "") + 
-  geom_vline(xintercept = 2018.5) +
-  geom_hline(data = data.frame(qname = "SSB [t]", data = 107000),
-             aes(yintercept = data), linetype = "dashed") +
-  geom_hline(data = data.frame(qname = "SSB [t]", data = 150000),
-             aes(yintercept = data), linetype = "solid") +
-  geom_hline(data = data.frame(qname = "F", data = 0.54),
-             aes(yintercept = data), linetype = "dashed") +
-  geom_hline(data = data.frame(qname = "F", data = 0.31),
-             aes(yintercept = data), linetype = "solid")
-ggsave(filename = paste0("output/runs/cod4/1000_20/plots/stock_plots/", 
-                         "stk_F0_10000iters_iters.png"),
-       width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
+# Alt2 OM
+### A, B, C, AD, BE, CE
+combs <- data.frame(name = c( "A*", "A", "B", "C", "AD", "BE", "CE"),
+                    HCR = c( "A", "A", "B", "C", "A", "B", "C"),
+                    BB = c(rep(FALSE, 4), TRUE, TRUE, TRUE),
+                    TACconstr = c(rep(FALSE, 4), TRUE, TRUE, TRUE),
+                    Btrigger = c(132000, 180000, 190000, 180000, 180000,
+                                 170000, 160000),
+                    Ftrgt = c(0.194, 0.28, 0.29, 0.28, 0.28, 0.27, 0.26))
+combs$OM<-"Alt2"
+
+lapply(X = split(combs, seq(nrow(combs))), FUN = function(i) {
+  plot_stk(stats = stats, OM_ = i$OM, HCR_ = i$HCR, Ftrgt_ = i$Ftrgt, 
+           Btrigger_ = i$Btrigger, TACconstr_ = i$TACconstr, BB_ = i$BB, 
+           overwrite_catch_history = T)
+})
+### plot with first five iterations
+lapply(X = split(combs, seq(nrow(combs))), FUN = function(i) {
+  plot_stk(stats = stats, OM_ = i$OM, HCR_ = i$HCR, Ftrgt_ = i$Ftrgt, 
+           Btrigger_ = i$Btrigger, TACconstr_ = i$TACconstr, BB_ = i$BB, 
+           overwrite_catch_history = T, iters_plot = 7:12)
+})
+
+# ### ------------------------------------------------------------------------ ###
+# ### F=0 plot ####
+# ### ------------------------------------------------------------------------ ###
+# 
+# stkF0 <- readRDS(file = "input/cod4/10000_100/data_F0.RData")$om@stock
+# stkF0_res <- readRDS("output/runs/cod4/F0_10000_100.rds")@stock
+# 
+# catch_n <- readRDS("input/cod4/10000_100/catch_n.rds")
+# catch.n(stkF0)[dimnames(catch_n)$age, dimnames(catch_n)$year] <- 
+#   catch_n
+# catch(stkF0) <- computeCatch(stkF0)
+# 
+# stkF0[, ac(2018:2118)] <- stkF0_res[, ac(2018:2118)]
+# plot(stkF0, probs = c(0.05, 0.25, 0.5, 0.75, 0.95)) +
+#   xlab("year") + geom_vline(xintercept = 2018.5) +
+#   geom_hline(data = data.frame(qname = "SSB", data = 107000),
+#              aes(yintercept = data), linetype = "dashed") +
+#   geom_hline(data = data.frame(qname = "SSB", data = 150000),
+#              aes(yintercept = data), linetype = "solid") +
+#   geom_hline(data = data.frame(qname = "F", data = 0.54),
+#              aes(yintercept = data), linetype = "dashed") +
+#   geom_hline(data = data.frame(qname = "F", data = 0.31),
+#              aes(yintercept = data), linetype = "solid") +
+#   theme_bw() #+
+# # geom_blank(data = as.data.frame(FLQuants(`Rec` = rec(stkF0),
+# #                                          `SSB` = ssb(stkF0),
+# #                                          `Catch` = catch(stkF0),
+# #                                          `F` = fbar(stkF0))), 
+# #            aes(x = year, y = data, group = iter))
+# ggsave(filename = paste0("output/runs/cod4/1000_20/plots/stock_plots/", 
+#                          "stk_F0_10000iters.png"),
+#        width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
+# ### iterations
+# stkF0_df <- as.data.frame(FLQuants(`Rec [1000]` = rec(stkF0),
+#                                    `SSB [t]` = ssb(stkF0),
+#                                    `Catch [t]` = catch(stkF0),
+#                                    `F` = fbar(stkF0)))
+# ggplot(data = stkF0_df[stkF0_df$iter %in% 1:1000, ], 
+#        aes(x = year, y = data, group = iter)) +
+#   geom_line(alpha = 0.025) +
+#   facet_wrap(~ qname, ncol = 1, strip.position = "right",
+#              scale = "free_y") +
+#   theme_bw() +
+#   ylim(c(0, NA)) + labs(y = "") + 
+#   geom_vline(xintercept = 2018.5) +
+#   geom_hline(data = data.frame(qname = "SSB [t]", data = 107000),
+#              aes(yintercept = data), linetype = "dashed") +
+#   geom_hline(data = data.frame(qname = "SSB [t]", data = 150000),
+#              aes(yintercept = data), linetype = "solid") +
+#   geom_hline(data = data.frame(qname = "F", data = 0.54),
+#              aes(yintercept = data), linetype = "dashed") +
+#   geom_hline(data = data.frame(qname = "F", data = 0.31),
+#              aes(yintercept = data), linetype = "solid")
+# ggsave(filename = paste0("output/runs/cod4/1000_20/plots/stock_plots/", 
+#                          "stk_F0_10000iters_iters.png"),
+#        width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
 
 
 ### ------------------------------------------------------------------------ ###
@@ -769,20 +858,21 @@ ggsave(filename = paste0("output/runs/cod4/1000_20/plots/stock_plots/",
 ### ------------------------------------------------------------------------ ###
 
 ### select maximum yield combinations
-combs <- data.frame(name = c("F0", "A*", "A", "B", "C", "AD", "BE", "CE"),
-                    OM = c("cod4"),
-                    HCR = c("F0", "A", "A", "B", "C", "A", "B", "C"),
-                    BB = c(rep(FALSE, 5), TRUE, TRUE, TRUE),
-                    TACconstr = c(rep(FALSE, 5), TRUE, TRUE, TRUE),
-                    Btrigger = c(0, 150000, 170000, 160000, 170000, 190000, 130000,
-                                 140000),
-                    Ftrgt = c(0, 0.31, 0.38, 0.38, 0.38, 0.40, 0.36, 0.36),
-                    scenario = 0)
+combs <- data.frame(name = c( "A*", "A", "B", "C", "AD", "BE", "CE"),
+                    OM = c("Baseline"),
+                    HCR = c( "A", "A", "B", "C", "A", "B", "C"),
+                    BB = c(rep(FALSE, 4), TRUE, TRUE, TRUE),
+                    TACconstr = c(rep(FALSE, 4), TRUE, TRUE, TRUE),
+                    Btrigger = c(132000, 180000, 190000, 180000, 180000,
+                                 170000, 160000),
+                    Ftrgt = c(0.194, 0.28, 0.29, 0.28, 0.28, 0.27, 0.26),
+                    scenario=0)
+
 combs <- merge(combs, stats, all.x = TRUE)
 combs2 <- gather(data = combs, key = "key", value = "value",
                  catch_median_long, risk3_long, iav_long,
                  ssb_median_long, recovery_proportion, recovery_time)
-combs2$name <- factor(combs2$name, levels = c("F0", "A*", "A", "B", "C", "AD", "BE", "CE"))
+combs2$name <- factor(combs2$name, levels = c("A*", "A", "B", "C", "AD", "BE", "CE"))
 
 ggplot(data = combs2, 
        mapping = aes(x = name, y = value, group = name)) +
@@ -793,11 +883,25 @@ ggplot(data = combs2,
 ### load entire distribution for stats
 stats_full <- function(data) {
   combs_full <- foreach(i = split(data, seq(nrow(data))), 
-                        .packages = "FLCore", .combine = rbind) %dopar% {
+                        .packages = "FLCore", .combine = rbind) %do% {
                           
-                          stk_i <- readRDS(paste0("output/runs/cod4/1000_20/", i$file))
-                          MSYBtrigger <- 150000
-                          Blim <- ifelse(!i$OM == "cod4_alt2", 107000, 110000)
+                          stk_i <- readRDS(paste0("output/runs/had4/1000_20/", i$file))
+                          MSYBtrigger <- 132000
+                          Blim <- 94000 #ifelse(!i$OM == "cod4_alt2", 107000, 110000)
+                          
+                          nonConv<-c(sum(stk_i@tracking["conv.est", ac(2018:2037)] != 0))
+                          nIter<-dim(stk_i@stock)[6]
+                          if (nonConv>0){
+                            pos_iter<-NULL 
+                            for (k in 1:nIter){
+                              if(sum(stk_i@tracking["conv.est",,,,,k],na.rm=T)>0){
+                                pos_iter<-c(pos_iter,k)
+                              }
+                            }
+                            stk2<-iter(stk_i@stock,c(1:nIter)[-pos_iter])
+                            stk_i@stock<-stk2
+                          }
+                          
                           res <- rbind(
                             data.frame(name = i$name, scenario = i$scenario,
                                        key = "catch_long",
@@ -871,7 +975,7 @@ stats_full <- function(data) {
                           return(res)
                         }
   combs_full$name <- factor(combs_full$name, 
-                            levels = c("F0", "A*", "A", "B", "C", "AD", "BE", "CE"))
+                            levels = c("A*", "A", "B", "C", "AD", "BE", "CE"))
   return(combs_full)
 }
 
@@ -1009,23 +1113,23 @@ p_recovery_time <-
 
 plot_grid(p_catch_long, p_risk1_long, p_risk3_long, p_iav_long, p_ssb_long,
           align = "hv")
-ggsave(filename = paste0("output/runs/cod4/1000_20/plots/baseOM_stats/", 
+ggsave(filename = paste0("output/runs/had4/1000_20/plots/baseOM_stats/", 
                          "summary_baseOM_long.png"), 
        width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
 plot_grid(p_catch_medium, p_risk1_medium, p_risk3_medium, p_iav_medium, 
           p_ssb_medium,
           align = "hv")
-ggsave(filename = paste0("output/runs/cod4/1000_20/plots/baseOM_stats/", 
+ggsave(filename = paste0("output/runs/had4/1000_20/plots/baseOM_stats/", 
                          "summary_baseOM_medium.png"), 
        width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
 plot_grid(p_catch_short, p_risk1_short, p_risk3_short, p_iav_short, p_ssb_short,
           align = "hv")
-ggsave(filename = paste0("output/runs/cod4/1000_20/plots/baseOM_stats/", 
+ggsave(filename = paste0("output/runs/had4/1000_20/plots/baseOM_stats/", 
                          "summary_baseOM_short.png"), 
        width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
 plot_grid(p_recovery_proportion, p_recovery_time,
           align = "hv")
-ggsave(filename = paste0("output/runs/cod4/1000_20/plots/baseOM_stats/", 
+ggsave(filename = paste0("output/runs/had4/1000_20/plots/baseOM_stats/", 
                          "summary_baseOM_recovery.png"), 
        width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
 
@@ -1040,22 +1144,31 @@ combs <- data.frame(name = rep(c("A", "B", "C", "AD", "BE", "CE"), each = 5),
                     HCR = rep(c("A", "B", "C", "A", "B", "C"), each = 5),
                     BB = rep(c(rep(FALSE, 3), rep(TRUE, 3)), each = 5),
                     TACconstr = rep(c(rep(FALSE, 3), rep(TRUE, 3)), each = 5),
-                    Btrigger = rep(c(170000, 160000, 170000, 190000, 130000,
-                                     140000), each = 5),
-                    Ftrgt = c(0.38 * c(0.9, 1, 1.1), 0.198, 0.46,
-                              0.38 * c(0.9, 1, 1.1), 0.198, 0.46,
-                              0.38 * c(0.9, 1, 1.1), 0.198, 0.46,
-                              0.40 * c(0.9, 1, 1.1), 0.198, 0.46,
-                              0.36 * c(0.9, 1, 1.1), 0.198, 0.46,
-                              0.36 * c(0.9, 1, 1.1), 0.198, 0.46),
+                    Btrigger = rep(c(180000, 190000, 180000, 180000, 170000,
+                                     160000), each = 5),
+                    Ftrgt = c(0.28 * c(0.9, 1, 1.1), 0.167, 0.194,
+                              0.29 * c(0.9, 1, 1.1), 0.167, 0.194,
+                              0.28 * c(0.9, 1, 1.1), 0.167, 0.194,
+                              0.28 * c(0.9, 1, 1.1), 0.167, 0.194,
+                              0.27 * c(0.9, 1, 1.1), 0.167, 0.194,
+                              0.26 * c(0.9, 1, 1.1), 0.167, 0.194),
                     scenario = c("0.9*Ftrgt", "Ftrgt", "1.1*Ftrgt",
                                  "Fmsylower", "Fmsyupper"),
-                    OM = "cod4")
+                    OM = "Baseline")
+combs<-rbind(combs,data.frame(name = rep(c("A", "AD"), each = 2),
+                              HCR = rep(c("A"), each = 4),
+                              BB = rep(c(rep(FALSE, 1), rep(TRUE, 1)), each = 2),
+                              TACconstr = rep(c(rep(FALSE, 1), rep(TRUE, 1)), each = 2),
+                              Btrigger = c(180000*c(1.5,2),
+                                           180000*c(1.5,2)),
+                              Ftrgt = rep(c(0.28, 0.28), each = 2), 
+                              scenario = c("1.5*Btrigger", "2*Btrigger"),
+                              OM = "Baseline"))
 combs <- merge(combs, stats)
 combs_dat <- stats_full(data = combs)
 combs_dat$scenario <- factor(combs_dat$scenario, 
                              levels = c("Fmsylower", "0.9*Ftrgt", "Ftrgt", 
-                                        "1.1*Ftrgt", "Fmsyupper"))
+                                        "1.1*Ftrgt", "Fmsyupper","1.5*Btrigger","2*Btrigger"))
 ggplot(data = combs_dat, 
        mapping = aes(x = name, y = value, group = interaction(scenario, name), 
                      colour = scenario)) +
@@ -1196,28 +1309,28 @@ plot_grid(plot_grid(p_catch_long, p_risk1_long, p_risk3_long, p_iav_long,
                     p_ssb_long + theme(legend.position = "none"),
                     align = "hv"),
           get_legend(p_ssb_long), nrow = 2, rel_heights = c(1, 0.1))
-ggsave(filename = paste0("output/runs/cod4/1000_20/plots/baseOM_stats_combs/", 
+ggsave(filename = paste0("output/runs/had4/1000_20/plots/baseOM_stats_combs/", 
                          "baseOM_combs_long.png"), 
        width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
 plot_grid(plot_grid(p_catch_medium, p_risk1_medium, p_risk3_medium, p_iav_medium,
                     p_ssb_medium + theme(legend.position = "none"),
                     align = "hv"),
           get_legend(p_ssb_medium), nrow = 2, rel_heights = c(1, 0.1))
-ggsave(filename = paste0("output/runs/cod4/1000_20/plots/baseOM_stats_combs/", 
+ggsave(filename = paste0("output/runs/had4/1000_20/plots/baseOM_stats_combs/", 
                          "baseOM_combs_medium.png"), 
        width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
 plot_grid(plot_grid(p_catch_short, p_risk1_short, p_risk3_short, p_iav_short,
                     p_ssb_short + theme(legend.position = "none"),
                     align = "hv"),
           get_legend(p_ssb_short), nrow = 2, rel_heights = c(1, 0.1))
-ggsave(filename = paste0("output/runs/cod4/1000_20/plots/baseOM_stats_combs/", 
+ggsave(filename = paste0("output/runs/had4/1000_20/plots/baseOM_stats_combs/", 
                          "baseOM_combs_short.png"), 
        width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
 plot_grid(plot_grid(p_recovery_proportion, 
                     p_recovery_time + theme(legend.position = "none"),
                     align = "hv"),
           get_legend(p_recovery_time), ncol = 2, rel_widths = c(0.5, 0.1))
-ggsave(filename = paste0("output/runs/cod4/1000_20/plots/baseOM_stats_combs/", 
+ggsave(filename = paste0("output/runs/had4/1000_20/plots/baseOM_stats_combs/", 
                          "baseOM_combs_recovery.png"), 
        width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
 
@@ -1228,18 +1341,17 @@ ggsave(filename = paste0("output/runs/cod4/1000_20/plots/baseOM_stats_combs/",
 
 ### alternative OMs
 ### select maximum yield combinations
-combs_alt <- data.frame(name = c("F0", "A*", "A", "B", "C", "AD", "BE", "CE"),
-                        HCR = c("F0", "A", "A", "B", "C", "A", "B", "C"),
-                        BB = c(rep(FALSE, 5), rep(TRUE, 3)),
-                        TACconstr = c(rep(FALSE, 5), rep(TRUE, 3)),
-                        Btrigger = c(0, 150000, 170000, 160000, 170000, 190000,
-                                     130000, 140000),
-                        Ftrgt = c(0, 0.31, 0.38, 0.38, 0.38, 0.40, 0.36, 0.36),
+combs_alt <- data.frame(name = c("A*", "A", "B", "C", "AD", "BE", "CE"),
+                        HCR = c("A", "A", "B", "C", "A", "B", "C"),
+                        BB = c(rep(FALSE, 4), rep(TRUE, 3)),
+                        TACconstr = c(rep(FALSE, 4), rep(TRUE, 3)),
+                        Btrigger = c(132000, 180000, 190000, 180000, 180000,
+                                     170000, 160000),
+                        Ftrgt = c(0.194, 0.28, 0.29, 0.28, 0.28, 0.27, 0.26),
                         scenario = 0)
-combs_alt <- rbind(cbind(combs_alt, OM = "cod4"),
-                   cbind(combs_alt, OM = "cod4_alt1"),
-                   cbind(combs_alt, OM = "cod4_alt2"),
-                   cbind(combs_alt, OM = "cod4_alt3"))
+combs_alt <- rbind(cbind(combs_alt, OM = "Baseline"),
+                   cbind(combs_alt, OM = "Alt1"),
+                   cbind(combs_alt, OM = "Alt2"))
 combs_alt <- merge(combs_alt, stats)
 combs_alt <- stats_full(data = combs_alt)
 ggplot(data = combs_alt, 
@@ -1392,28 +1504,28 @@ plot_grid(plot_grid(p_catch_long, p_risk1_long, p_risk3_long, p_iav_long,
                     p_ssb_long + theme(legend.position = "none"),
                     align = "hv"),
           get_legend(p_ssb_long), nrow = 2, rel_heights = c(1, 0.1))
-ggsave(filename = paste0("output/runs/cod4/1000_20/plots/altOMs_stats/", 
+ggsave(filename = paste0("output/runs/had4/1000_20/plots/altOMs_stats/", 
                          "summary_altOM_long.png"), 
        width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
 plot_grid(plot_grid(p_catch_medium, p_risk1_medium, p_risk3_medium, p_iav_medium,
                     p_ssb_medium + theme(legend.position = "none"),
                     align = "hv"),
           get_legend(p_ssb_medium), nrow = 2, rel_heights = c(1, 0.1))
-ggsave(filename = paste0("output/runs/cod4/1000_20/plots/altOMs_stats/", 
+ggsave(filename = paste0("output/runs/had4/1000_20/plots/altOMs_stats/", 
                          "summary_altOM_medium.png"), 
        width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
 plot_grid(plot_grid(p_catch_short, p_risk1_short, p_risk3_short, p_iav_short,
                     p_ssb_short + theme(legend.position = "none"),
                     align = "hv"),
           get_legend(p_ssb_short), nrow = 2, rel_heights = c(1, 0.1))
-ggsave(filename = paste0("output/runs/cod4/1000_20/plots/altOMs_stats/", 
+ggsave(filename = paste0("output/runs/had4/1000_20/plots/altOMs_stats/", 
                          "summary_altOM_short.png"), 
        width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
 plot_grid(plot_grid(p_recovery_proportion, 
                     p_recovery_time + theme(legend.position = "none"),
                     align = "hv"),
           get_legend(p_recovery_time), ncol = 2, rel_widths = c(0.5, 0.1))
-ggsave(filename = paste0("output/runs/cod4/1000_20/plots/altOMs_stats/", 
+ggsave(filename = paste0("output/runs/had4/1000_20/plots/altOMs_stats/", 
                          "summary_altOM_recovery.png"), 
        width = 30, height = 20, units = "cm", dpi = 300, type = "cairo")
 
@@ -1526,11 +1638,15 @@ ggsave(filename = paste0("output/runs/cod4/1000_20/plots/altOMs_stats/",
 ### compare OM SSB/F with MP SSB/F ####
 ### ------------------------------------------------------------------------ ###
 
-df <- foreach(OM = c("cod4", "cod4_alt1", "cod4_alt2", "cod4_alt3"),
+df <- foreach(OM = c("Baseline", "Alt1", "Alt2"),
               .combine = rbind) %do% {
-                res <- readRDS(paste0("output/runs/cod4/1000_20/", OM, "_HCR-A_Ftrgt-0.38",
-                                      "_Btrigger-170000_TACconstr-FALSE_BB-FALSE.rds"))
-                res_input <- readRDS(paste0("input/", OM, "/1000_20/base_run.rds"))$om@stock
+                res <- readRDS(paste0("output/runs/had4/1000_20/", OM, "_HCR-A_Ftrgt-0.28",
+                                      "_Btrigger-180000_TACconstr-FALSE_BB-FALSE.rds"))
+                if(OM %in% "Alt1"){
+                  res_input <- readRDS(paste0("input/had4/999_20/MPbase_OM",OM,"_999.rds"))$om@stock
+                  }else{
+                  res_input <- readRDS(paste0("input/had4/1000_20/MPbase_OM",OM,"_1000.rds"))$om@stock
+                }
                 tmp <- FLQuant(NA, dimnames = list(
                   metric = c("F.om", "SSB.om", "F.est", "SSB.est", "F", "SSB"), 
                   year = dimnames(res_input)$year,
@@ -1567,7 +1683,7 @@ ggplot(data = df %>% filter(metric %in% c("F", "SSB")),
   theme_bw() +
   geom_hline(yintercept = 1, alpha = 0.5) +
   labs(y = "MP value / OM value")
-ggsave(filename = paste0("output/runs/cod4/1000_20/plots/altOMs_stats/", 
+ggsave(filename = paste0("output/runs/had4/1000_20/plots/altOMs_stats/", 
                          "MP_vs_OM.png"), 
        width = 20, height = 20, units = "cm", dpi = 300, type = "cairo")
 
@@ -1823,13 +1939,13 @@ ggsave(filename = paste0("output/runs/cod4/1000_20/plots/baseOM_TAC_constraint/"
 ### ------------------------------------------------------------------------ ###
 
 ### get optimized A
-stkA_file <- stats %>% filter(OM == "cod4" & Ftrgt == 0.38 & Btrigger == 170000 &
+stkA_file <- stats %>% filter(OM == "Baseline" & Ftrgt == 0.28 & Btrigger == 180000 &
                                 TACconstr == FALSE & BB == FALSE & HCR == "A")
 ### get simulated SSB
-ssbA_new <- ssb(readRDS(paste0("output/runs/cod4/1000_20/", 
+ssbA_new <- ssb(readRDS(paste0("output/runs/had4/1000_20/", 
                                stkA_file$file))@stock)
 ### get historical SSB
-ssbA <- ssb(readRDS("input/cod4/1000_20/base_run.rds")$om@stock)
+ssbA <- ssb(readRDS("input/had4/1000_20/MPbase_OMBaseline_1000.rds")$om@stock)
 ### combine
 ssbA[, dimnames(ssbA_new)$year] <- ssbA_new
 ### calculate annual risk
@@ -1842,6 +1958,57 @@ ggplot(data = as.data.frame(window(riskA, start = 2018)),
   labs(x = "year", y = "p(SSB<Blim)") +
   geom_vline(data = data.frame(x = c(2018.5, 2023.5, 2028.5)),
              aes(xintercept = x), linetype = "dashed")
-ggsave(filename = paste0("output/runs/cod4/1000_20/plots/stock_plots/", 
-                         "risk_A_optimized.png"), 
+ggsave(filename = paste0("output/runs/had4/1000_20/plots/stock_plots/", 
+                         "Baseline_risk_A_optimized.png"), 
+       width = 15, height = 10, units = "cm", dpi = 300, type = "cairo")
+
+
+
+#Alt1
+### get optimized A
+stkA_file <- stats %>% filter(OM == "Alt1" & Ftrgt == 0.28 & Btrigger == 180000 &
+                                TACconstr == FALSE & BB == FALSE & HCR == "A")
+### get simulated SSB
+ssbA_new <- ssb(readRDS(paste0("output/runs/had4/1000_20/", 
+                               stkA_file$file))@stock)
+### get historical SSB
+ssbA <- ssb(readRDS("input/had4/999_20/MPbase_OMAlt1_999.rds")$om@stock)
+### combine
+ssbA[, dimnames(ssbA_new)$year] <- ssbA_new
+### calculate annual risk
+riskA <- apply((ssbA < stkA_file$Blim), 2, mean)
+### plot
+ggplot(data = as.data.frame(window(riskA, start = 2018)), 
+       aes(x = year , y = data)) +
+  geom_line() +
+  theme_bw() +
+  labs(x = "year", y = "p(SSB<Blim)") +
+  geom_vline(data = data.frame(x = c(2018.5, 2023.5, 2028.5)),
+             aes(xintercept = x), linetype = "dashed")
+ggsave(filename = paste0("output/runs/had4/1000_20/plots/stock_plots/", 
+                         "Alt1_risk_A_optimized.png"), 
+       width = 15, height = 10, units = "cm", dpi = 300, type = "cairo")
+
+### get optimized A
+stkA_file <- stats %>% filter(OM == "Alt2" & Ftrgt == 0.28 & Btrigger == 180000 &
+                                TACconstr == FALSE & BB == FALSE & HCR == "A")
+### get simulated SSB
+ssbA_new <- ssb(readRDS(paste0("output/runs/had4/1000_20/", 
+                               stkA_file$file))@stock)
+### get historical SSB
+ssbA <- ssb(readRDS("input/had4/1000_20/MPbase_OMAlt2_1000.rds")$om@stock)
+### combine
+ssbA[, dimnames(ssbA_new)$year] <- ssbA_new
+### calculate annual risk
+riskA <- apply((ssbA < stkA_file$Blim), 2, mean)
+### plot
+ggplot(data = as.data.frame(window(riskA, start = 2018)), 
+       aes(x = year , y = data)) +
+  geom_line() +
+  theme_bw() +
+  labs(x = "year", y = "p(SSB<Blim)") +
+  geom_vline(data = data.frame(x = c(2018.5, 2023.5, 2028.5)),
+             aes(xintercept = x), linetype = "dashed")
+ggsave(filename = paste0("output/runs/had4/1000_20/plots/stock_plots/", 
+                         "Alt2_risk_A_optimized.png"), 
        width = 15, height = 10, units = "cm", dpi = 300, type = "cairo")
